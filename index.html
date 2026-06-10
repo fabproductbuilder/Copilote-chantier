@@ -271,13 +271,15 @@
           <div class="media-card">
             <img id="mainPhoto" src="assets/chantier-renovation.png" alt="Photo chantier salle de bain" />
             <div class="photo-overlay">
-              <span>4 photos</span>
-              <span>Photo chantier</span>
+              <span id="photoCount">0 photo</span>
+              <span>Photos chantier</span>
             </div>
           </div>
 
+          <div class="photo-gallery" id="photoGallery" aria-label="Galerie photos chantier"></div>
+
           <label class="dropzone" for="photoInput">
-            <input id="photoInput" type="file" accept="image/*" multiple />
+            <input id="photoInput" type="file" accept="image/*" capture="environment" multiple />
             <svg><use href="#icon-camera"></use></svg>
             <span>Ajouter photos</span>
           </label>
@@ -469,6 +471,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="app.js?v=v1-validation-20260610"></script>
+    <script src="app.js?v=v1-photos-fix-20260610"></script>
   </body>
 </html>
