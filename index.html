@@ -52,41 +52,173 @@
       <symbol id="icon-chevron" viewBox="0 0 24 24">
         <path d="m9 18 6-6-6-6" />
       </symbol>
+      <symbol id="icon-home" viewBox="0 0 24 24">
+        <path d="m3 10 9-7 9 7" />
+        <path d="M5 9v11h14V9M10 20v-6h4v6" />
+      </symbol>
+      <symbol id="icon-folder" viewBox="0 0 24 24">
+        <path d="M3 6h6l2 2h10v13H3z" />
+      </symbol>
     </svg>
 
     <div class="app-shell">
       <header class="topbar">
         <div class="brand">
-          <span class="brand-mark">CC</span>
-          <div>
-            <strong>Copilote Chantier</strong>
-            <span>Rénovation terrain</span>
-          </div>
+          <img
+            class="brand-logo"
+            src="assets/logo-copilote-chantier.png"
+            alt="Copilote Chantier"
+          />
         </div>
 
         <div class="topbar-actions" aria-label="Actions rapides">
-          <button class="icon-button" id="resetButton" title="Nouveau dossier" type="button">
-            <svg><use href="#icon-plus"></use></svg>
+          <button class="button secondary" id="homeButton" type="button">
+            <svg><use href="#icon-home"></use></svg>
+            Accueil
           </button>
-          <button class="button secondary" id="printButton" type="button">
+          <button class="button secondary" id="topNewFolderButton" type="button">
+            <svg><use href="#icon-plus"></use></svg>
+            Nouvelle visite
+          </button>
+          <button class="button secondary detail-only" id="printButton" type="button">
             <svg><use href="#icon-print"></use></svg>
             PDF
           </button>
-          <button class="button primary" id="generateButtonTop" type="button">
+          <button class="button primary detail-only" id="generateButtonTop" type="button">
             <svg><use href="#icon-zap"></use></svg>
-            Générer
+            Analyser la visite
           </button>
         </div>
       </header>
 
-      <main class="workspace">
+      <main class="home-view" id="homeView">
+        <section class="home-grid">
+          <div class="panel home-summary" aria-labelledby="homeTitle">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Accueil</p>
+                <h1 id="homeTitle">Visites chantier</h1>
+              </div>
+              <button class="button primary" id="newFolderButton" type="button">
+                <svg><use href="#icon-plus"></use></svg>
+                Nouvelle visite
+              </button>
+            </div>
+
+            <div class="metric-grid" aria-label="Synthèse dossiers">
+              <div class="metric">
+                <span>Total</span>
+                <strong id="totalFoldersCount">0</strong>
+              </div>
+              <div class="metric">
+                <span>Brouillons</span>
+                <strong id="draftFoldersCount">0</strong>
+              </div>
+              <div class="metric">
+                <span>Devis envoyés</span>
+                <strong id="sentFoldersCount">0</strong>
+              </div>
+              <div class="metric">
+                <span>Acceptés</span>
+                <strong id="acceptedFoldersCount">0</strong>
+              </div>
+            </div>
+          </div>
+
+          <form class="panel create-panel" id="newFolderForm" hidden>
+            <div class="panel-header compact">
+              <div>
+                <p class="eyebrow">Création</p>
+                <h2>Nouvelle visite</h2>
+              </div>
+            </div>
+
+            <div class="field-grid">
+              <label class="field">
+                <span>Client</span>
+                <input id="newClientName" placeholder="Nom du client" />
+              </label>
+              <label class="field">
+                <span>Téléphone</span>
+                <input id="newClientPhone" inputmode="tel" placeholder="06 00 00 00 00" />
+              </label>
+            </div>
+
+            <div class="field-grid">
+              <label class="field">
+                <span>Email</span>
+                <input id="newClientEmail" inputmode="email" placeholder="client@email.fr" />
+              </label>
+              <label class="field">
+                <span>Ville</span>
+                <input id="newClientCity" placeholder="Ville" />
+              </label>
+            </div>
+
+            <div class="field-grid">
+              <label class="field">
+                <span>Type chantier</span>
+                <select id="newClientTrade">
+                  <option value="renovation">Rénovation</option>
+                  <option value="plomberie">Plomberie</option>
+                  <option value="peinture">Peinture</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Statut</span>
+                <select id="newClientStatus">
+                  <option value="draft">Brouillon</option>
+                  <option value="sent">Devis envoyé</option>
+                  <option value="accepted">Accepté</option>
+                  <option value="declined">Refusé</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="button-row">
+              <button class="button primary stretch" type="submit">
+                <svg><use href="#icon-folder"></use></svg>
+                Créer visite
+              </button>
+              <button class="button secondary" id="cancelNewFolder" type="button">Annuler</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel folders-panel" aria-labelledby="foldersTitle">
+          <div class="panel-header compact">
+            <div>
+              <p class="eyebrow">Chantiers</p>
+              <h2 id="foldersTitle">Liste des visites</h2>
+            </div>
+            <label class="status-filter">
+              <span>Statut</span>
+              <select id="statusFilter">
+                <option value="all">Tous</option>
+                <option value="draft">Brouillon</option>
+                <option value="sent">Devis envoyé</option>
+                <option value="accepted">Accepté</option>
+                <option value="declined">Refusé</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="folder-list" id="folderList"></div>
+          <div class="empty-state" id="emptyState" hidden>
+            <svg><use href="#icon-folder"></use></svg>
+            <strong>Aucun dossier</strong>
+          </div>
+        </section>
+      </main>
+
+      <main class="workspace detail-view" id="detailView" hidden>
         <section class="panel intake-panel" aria-labelledby="intakeTitle">
           <div class="panel-header">
             <div>
-              <p class="eyebrow">Nouveau dossier</p>
+              <p class="eyebrow">Visite chantier</p>
               <h1 id="intakeTitle">Visite chez M. Martin</h1>
             </div>
-            <span class="status-pill ready">Prêt</span>
+            <span class="status-pill ready" id="detailStatusPill">Brouillon</span>
           </div>
 
           <div class="field-grid">
@@ -98,22 +230,49 @@
               <span>Ville</span>
               <input id="clientCity" value="Lyon 6e" />
             </label>
+            <label class="field">
+              <span>Téléphone</span>
+              <input id="clientPhone" inputmode="tel" />
+            </label>
+            <label class="field">
+              <span>Email</span>
+              <input id="clientEmail" inputmode="email" />
+            </label>
+            <label class="field">
+              <span>Statut</span>
+              <select id="detailStatus">
+                <option value="draft">Brouillon</option>
+                <option value="sent">Devis envoyé</option>
+                <option value="accepted">Accepté</option>
+                <option value="declined">Refusé</option>
+              </select>
+            </label>
           </div>
 
           <div class="control-block">
-            <span class="label">Métier</span>
-            <div class="segmented" role="group" aria-label="Métier">
+            <span class="label">Type de chantier</span>
+            <div class="segmented" role="group" aria-label="Type de chantier">
               <button class="segment active" data-trade="renovation" type="button">Rénovation</button>
               <button class="segment" data-trade="plomberie" type="button">Plomberie</button>
               <button class="segment" data-trade="peinture" type="button">Peinture</button>
             </div>
           </div>
 
+          <div class="voice-box">
+            <div class="voice-toolbar">
+              <button class="icon-button active" id="voiceButton" title="Dicter une note" type="button">
+                <svg><use href="#icon-mic"></use></svg>
+              </button>
+              <span>Note de visite transcrite</span>
+            </div>
+            <textarea id="voiceNote">Cuisine et petite salle de bain à refaire. Reprise plomberie sous vasque, dépose ancien meuble, carrelage mural sur 8 m², peinture plafond et finitions. Appartement occupé, accès par ascenseur.</textarea>
+          </div>
+
           <div class="media-card">
             <img id="mainPhoto" src="assets/chantier-renovation.png" alt="Photo chantier salle de bain" />
             <div class="photo-overlay">
               <span>4 photos</span>
-              <span>Analyse IA</span>
+              <span>Photo chantier</span>
             </div>
           </div>
 
@@ -123,20 +282,10 @@
             <span>Ajouter photos</span>
           </label>
 
-          <div class="voice-box">
-            <div class="voice-toolbar">
-              <button class="icon-button active" id="voiceButton" title="Dicter une note" type="button">
-                <svg><use href="#icon-mic"></use></svg>
-              </button>
-              <span>Note vocale transcrite</span>
-            </div>
-            <textarea id="voiceNote">Cuisine et petite salle de bain à refaire. Reprise plomberie sous vasque, dépose ancien meuble, carrelage mural sur 8 m², peinture plafond et finitions. Appartement occupé, accès par ascenseur.</textarea>
-          </div>
-
           <div class="button-row">
             <button class="button primary stretch" id="generateButton" type="button">
               <svg><use href="#icon-zap"></use></svg>
-              Créer pré-devis
+              Analyser la visite
             </button>
             <button class="button secondary" id="pdfInputButton" type="button">
               <svg><use href="#icon-file"></use></svg>
@@ -148,22 +297,39 @@
         <section class="panel quote-panel" aria-labelledby="quoteTitle">
           <div class="panel-header quote-heading">
             <div>
-              <p class="eyebrow">Sortie IA</p>
+              <p class="eyebrow">Préparation devis</p>
               <h2 id="quoteTitle">Pré-devis</h2>
             </div>
-            <div class="confidence">
-              <span>Confiance</span>
-              <strong id="confidenceValue">82%</strong>
+            <div class="analysis-card" aria-label="Validation du pré-devis">
+              <div class="analysis-card-main">
+                <span>Analyse IA</span>
+                <strong>À valider</strong>
+              </div>
+              <p>Pré-devis généré automatiquement. Vérifiez les postes, quantités et prix avant envoi.</p>
+              <ul>
+                <li>Quantités à vérifier</li>
+                <li>Prix à valider</li>
+                <li>Risques détectés</li>
+                <li>Photos prises en compte</li>
+              </ul>
             </div>
           </div>
 
           <div class="detected-list" id="detectedList"></div>
 
+          <div class="quote-tools">
+            <span>Postes modifiables avant validation</span>
+            <button class="button secondary" id="addQuoteRow" type="button">
+              <svg><use href="#icon-plus"></use></svg>
+              Ajouter poste
+            </button>
+          </div>
+
           <div class="quote-table" aria-label="Lignes du devis">
             <div class="quote-row quote-head">
               <span>Poste</span>
               <span>Qté</span>
-              <span>Total</span>
+              <span>Prix</span>
             </div>
             <div id="quoteRows"></div>
           </div>
@@ -205,7 +371,7 @@
               <svg><use href="#icon-clock"></use></svg>
               <div>
                 <strong>Validation artisan</strong>
-                <span>Ajuster quantités avant envoi</span>
+                <span>Modifier postes, quantités et prix avant email</span>
               </div>
             </div>
           </div>
@@ -216,7 +382,7 @@
             <div class="panel-header compact">
               <div>
                 <p class="eyebrow">Actions</p>
-                <h2 id="actionsTitle">Suivi client</h2>
+                <h2 id="actionsTitle">Email + suivi</h2>
               </div>
               <label class="switch">
                 <input id="autoFollowup" type="checkbox" checked />
@@ -232,15 +398,28 @@
 
             <div class="tab-panel active" id="tab-message">
               <textarea id="clientMessage" class="message-text"></textarea>
+              <textarea id="whatsappMessage" class="message-text compact-message" readonly></textarea>
               <div class="button-row">
-                <button class="button primary stretch" id="copyMessage" type="button">
-                  <svg><use href="#icon-copy"></use></svg>
-                  Copier
-                </button>
-                <button class="button secondary" id="sendButton" type="button">
+                <button class="button primary stretch" id="prepareEmailButton" type="button">
                   <svg><use href="#icon-send"></use></svg>
-                  WhatsApp
+                  Préparer l'email + PDF
                 </button>
+                <button class="button secondary" id="copyWhatsappButton" type="button">
+                  <svg><use href="#icon-copy"></use></svg>
+                  Copier message WhatsApp
+                </button>
+              </div>
+
+              <div class="followup-plan">
+                <span>Relances prévues</span>
+                <label>
+                  <input id="followupJ3" type="checkbox" checked />
+                  J+3
+                </label>
+                <label>
+                  <input id="followupJ7" type="checkbox" checked />
+                  J+7
+                </label>
               </div>
             </div>
 
@@ -257,14 +436,14 @@
             <div class="panel-header compact">
               <div>
                 <p class="eyebrow">Mémoire</p>
-                <h2 id="memoryTitle">Dossier client</h2>
+                <h2 id="memoryTitle">Visite client</h2>
               </div>
             </div>
 
             <div class="client-facts">
               <div>
                 <span>Dernier échange</span>
-                <strong>Aujourd'hui 10:42</strong>
+                <strong id="lastUpdateValue">Aujourd'hui</strong>
               </div>
               <div>
                 <span>Budget annoncé</span>
@@ -279,7 +458,7 @@
             <div class="next-step">
               <span>Prochaine action</span>
               <button class="next-action" id="nextAction" type="button">
-                Envoyer le devis vendredi matin
+                Relance J+3 prête
                 <svg><use href="#icon-chevron"></use></svg>
               </button>
             </div>
@@ -290,6 +469,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=v1-validation-20260610"></script>
   </body>
 </html>
