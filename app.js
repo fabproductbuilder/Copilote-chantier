@@ -824,7 +824,7 @@ function analyzeVisit() {
   });
   renderAll();
   renderDetailMeta();
-  showToast("Visite analysée, pré-devis prêt à vérifier");
+  showToast("Compte-rendu généré, éléments financiers à vérifier");
 }
 
 async function copyText(text, fallbackElement) {
@@ -1062,11 +1062,11 @@ document.querySelector("#voiceButton").addEventListener("click", () => {
     "Salle de bain à refaire après dégât des eaux. Prévoir protection escalier, reprise support, plomberie sous vasque, joints et peinture plafond.";
   renderReport();
   persistDetailFields();
-  showToast("Note dictée simulée");
+  showToast("Note de visite ajoutée");
 });
 
 document.querySelector("#pdfInputButton").addEventListener("click", () => {
-  showToast("Import de plan simulé");
+  showToast("Ajout de plan à prévoir plus tard");
 });
 
 document.querySelector("#nextAction").addEventListener("click", () => {

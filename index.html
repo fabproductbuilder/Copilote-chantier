@@ -86,7 +86,7 @@
           </button>
           <button class="button primary detail-only" id="generateButtonTop" type="button">
             <svg><use href="#icon-zap"></use></svg>
-            Analyser la visite
+            Générer le compte-rendu
           </button>
         </div>
       </header>
@@ -212,10 +212,11 @@
       </main>
 
       <main class="workspace detail-view" id="detailView" hidden>
+        <div class="main-flow">
         <section class="panel intake-panel" aria-labelledby="intakeTitle">
           <div class="panel-header">
             <div>
-              <p class="eyebrow">Visite chantier</p>
+              <p class="eyebrow">Informations client</p>
               <h1 id="intakeTitle">Visite chez M. Martin</h1>
             </div>
             <span class="status-pill ready" id="detailStatusPill">Brouillon</span>
@@ -258,14 +259,14 @@
             </div>
           </div>
 
-          <div class="voice-box">
-            <div class="voice-toolbar">
-              <button class="icon-button active" id="voiceButton" title="Dicter une note" type="button">
-                <svg><use href="#icon-mic"></use></svg>
-              </button>
-              <span>Note de visite transcrite</span>
+        </section>
+
+        <section class="panel photos-panel" aria-labelledby="photosTitle">
+          <div class="panel-header compact">
+            <div>
+              <p class="eyebrow">Terrain</p>
+              <h2 id="photosTitle">Photos de visite</h2>
             </div>
-            <textarea id="voiceNote">Cuisine et petite salle de bain à refaire. Reprise plomberie sous vasque, dépose ancien meuble, carrelage mural sur 8 m², peinture plafond et finitions. Appartement occupé, accès par ascenseur.</textarea>
           </div>
 
           <div class="media-card">
@@ -283,11 +284,30 @@
             <svg><use href="#icon-camera"></use></svg>
             <span>Ajouter photos</span>
           </label>
+        </section>
+
+        <section class="panel note-panel" aria-labelledby="noteTitle">
+          <div class="panel-header compact">
+            <div>
+              <p class="eyebrow">Observation</p>
+              <h2 id="noteTitle">Note de visite</h2>
+            </div>
+          </div>
+
+          <div class="voice-box">
+            <div class="voice-toolbar">
+              <button class="icon-button active" id="voiceButton" title="Dicter une note" type="button">
+                <svg><use href="#icon-mic"></use></svg>
+              </button>
+              <span>Note saisie pendant la visite</span>
+            </div>
+            <textarea id="voiceNote">Cuisine et petite salle de bain à refaire. Reprise plomberie sous vasque, dépose ancien meuble, carrelage mural sur 8 m², peinture plafond et finitions. Appartement occupé, accès par ascenseur.</textarea>
+          </div>
 
           <div class="button-row">
             <button class="button primary stretch" id="generateButton" type="button">
               <svg><use href="#icon-zap"></use></svg>
-              Analyser la visite
+              Générer le compte-rendu
             </button>
             <button class="button secondary" id="pdfInputButton" type="button">
               <svg><use href="#icon-file"></use></svg>
@@ -296,22 +316,32 @@
           </div>
         </section>
 
+        <section class="panel report-panel" aria-labelledby="reportTitle">
+          <div class="panel-header compact">
+            <div>
+              <p class="eyebrow">Compte-rendu</p>
+              <h2 id="reportTitle">Compte-rendu de visite</h2>
+            </div>
+          </div>
+          <div class="report-card" id="reportCard"></div>
+        </section>
+
         <section class="panel quote-panel" aria-labelledby="quoteTitle">
           <div class="panel-header quote-heading">
             <div>
-              <p class="eyebrow">Préparation devis</p>
-              <h2 id="quoteTitle">Pré-devis</h2>
+              <p class="eyebrow">Second niveau</p>
+              <h2 id="quoteTitle">Pré-devis à vérifier</h2>
             </div>
             <div class="analysis-card" aria-label="Validation du pré-devis">
               <div class="analysis-card-main">
-                <span>Analyse IA</span>
-                <strong>À valider</strong>
+                <span>Validation artisan</span>
+                <strong>À vérifier</strong>
               </div>
-              <p>Pré-devis généré automatiquement. Vérifiez les postes, quantités et prix avant envoi.</p>
+              <p>Éléments financiers préparés pour gagner du temps. Vérifiez les postes, quantités et prix avant envoi.</p>
               <ul>
                 <li>Quantités à vérifier</li>
                 <li>Prix à valider</li>
-                <li>Risques détectés</li>
+                <li>Points chantier à confirmer</li>
                 <li>Photos prises en compte</li>
               </ul>
             </div>
@@ -358,15 +388,15 @@
             <div class="timeline-item done">
               <svg><use href="#icon-check"></use></svg>
               <div>
-                <strong>Photos triées</strong>
-                <span>4 éléments gardés dans le dossier client</span>
+                <strong>Photos de visite</strong>
+                <span>Éléments gardés dans la visite client</span>
               </div>
             </div>
             <div class="timeline-item done">
               <svg><use href="#icon-check"></use></svg>
               <div>
-                <strong>Risques repérés</strong>
-                <span>Appartement occupé, protection à prévoir</span>
+                <strong>Points à confirmer</strong>
+                <span>Accès, protections, matériaux et planning</span>
               </div>
             </div>
             <div class="timeline-item">
@@ -378,13 +408,14 @@
             </div>
           </div>
         </section>
+        </div>
 
         <aside class="side-stack">
           <section class="panel actions-panel" aria-labelledby="actionsTitle">
             <div class="panel-header compact">
               <div>
                 <p class="eyebrow">Actions</p>
-                <h2 id="actionsTitle">Email + suivi</h2>
+                <h2 id="actionsTitle">Envoyer et suivre</h2>
               </div>
               <label class="switch">
                 <input id="autoFollowup" type="checkbox" checked />
@@ -395,7 +426,6 @@
             <div class="tabs" role="tablist" aria-label="Sorties">
               <button class="tab active" data-tab="message" type="button">Message</button>
               <button class="tab" data-tab="materials" type="button">Matériaux</button>
-              <button class="tab" data-tab="report" type="button">CR</button>
             </div>
 
             <div class="tab-panel active" id="tab-message">
@@ -427,10 +457,6 @@
 
             <div class="tab-panel" id="tab-materials">
               <ul class="materials-list" id="materialsList"></ul>
-            </div>
-
-            <div class="tab-panel" id="tab-report">
-              <div class="report-card" id="reportCard"></div>
             </div>
           </section>
 
@@ -471,6 +497,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="app.js?v=v1-photos-fix-20260610"></script>
+    <script src="app.js?v=v1-terrain-flow-20260610"></script>
   </body>
 </html>

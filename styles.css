@@ -244,9 +244,15 @@ body[data-view="home"] .detail-only {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(320px, 0.9fr) minmax(430px, 1.25fr) minmax(310px, 0.85fr);
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
   gap: 14px;
   align-items: start;
+}
+
+.main-flow {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
 }
 
 .panel {
@@ -258,6 +264,9 @@ body[data-view="home"] .detail-only {
 }
 
 .intake-panel,
+.photos-panel,
+.note-panel,
+.report-panel,
 .quote-panel,
 .actions-panel,
 .memory-panel {
@@ -267,6 +276,7 @@ body[data-view="home"] .detail-only {
 .side-stack {
   display: grid;
   gap: 14px;
+  min-width: 0;
 }
 
 .panel-header {
@@ -424,6 +434,11 @@ h2 {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: #dfe7e0;
+}
+
+.photos-panel .media-card,
+.note-panel .voice-box {
+  margin-top: 0;
 }
 
 .media-card img {
@@ -1118,12 +1133,7 @@ h2 {
   }
 
   .workspace {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .side-stack {
-    grid-column: 1 / -1;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 330px);
   }
 }
 
@@ -1210,6 +1220,9 @@ h2 {
 
 @media (max-width: 430px) {
   .intake-panel,
+  .photos-panel,
+  .note-panel,
+  .report-panel,
   .quote-panel,
   .actions-panel,
   .memory-panel {
@@ -1265,6 +1278,9 @@ h2 {
   .topbar,
   .home-view,
   .intake-panel,
+  .photos-panel,
+  .note-panel,
+  .report-panel,
   .side-stack,
   .toast {
     display: none;
@@ -1276,6 +1292,10 @@ h2 {
   }
 
   .workspace {
+    display: block;
+  }
+
+  .main-flow {
     display: block;
   }
 
