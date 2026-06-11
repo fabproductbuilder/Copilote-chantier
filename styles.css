@@ -1079,63 +1079,6 @@ h2 {
   white-space: normal;
 }
 
-.followup-plan {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 8px;
-  align-items: center;
-  margin-top: 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 10px;
-  background: #fff;
-}
-
-.followup-plan span {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 850;
-  text-transform: uppercase;
-}
-
-.followup-plan label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 850;
-}
-
-.materials-list {
-  display: grid;
-  gap: 8px;
-  padding: 0;
-  margin: 0;
-  list-style: none;
-}
-
-.materials-list li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 46px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 9px 10px;
-  background: #fff;
-}
-
-.materials-list strong {
-  min-width: 0;
-  font-size: 14px;
-}
-
-.materials-list span {
-  flex: 0 0 auto;
-  color: var(--muted);
-  font-weight: 800;
-}
-
 .report-card {
   display: grid;
   gap: 10px;
@@ -1326,10 +1269,6 @@ h2 {
 
   .button {
     padding: 0 10px;
-  }
-
-  .followup-plan {
-    grid-template-columns: 1fr;
   }
 
   .photo-gallery {

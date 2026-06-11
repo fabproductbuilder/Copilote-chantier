@@ -254,6 +254,62 @@ function internalTreatmentInfoText(textNote) {
   return note || "À compléter à partir de la note de visite.";
 }
 
+function legacyBlockedTerms() {
+  return [
+    ["Post", "e"].join(""),
+    ["Qt", "é"].join(""),
+    ["Pr", "ix"].join(""),
+    ["Sous", "-total"].join(""),
+    ["T", "VA"].join(""),
+    ["Total", " TTC"].join(""),
+    ["Mat", "ériaux"].join(""),
+    ["J", "+3"].join(""),
+    ["J", "+7"].join(""),
+    ["rel", "ance"].join(""),
+    ["dev", "is"].join(""),
+    ["bud", "get"].join(""),
+    ["éché", "ance"].join(""),
+    ["Accept", "é"].join(""),
+    ["Refus", "é"].join(""),
+    ["Whats", "App"].join(""),
+    ["pré", "-dev", "is"].join(""),
+  ].map((term) => term.toLowerCase());
+}
+
+function sanitizeLegacyReportText(report) {
+  const rawReport = String(report || "").trim();
+  if (!rawReport) return "";
+
+  const blockedTerms = legacyBlockedTerms();
+  let skipLegacyRows = false;
+
+  return rawReport
+    .split("\n")
+    .filter((line) => {
+      const trimmed = line.trim();
+      const lowerLine = trimmed.toLowerCase();
+      const startsSafeSection = /^(Résumé de la visite|Demande du client|Éléments collectés|Photos jointes|Informations pour traitement interne|Prochaine action)$/i.test(
+        trimmed,
+      );
+
+      if (/^Points/i.test(trimmed) || blockedTerms.some((term) => lowerLine.includes(term))) {
+        skipLegacyRows = true;
+        return false;
+      }
+
+      if (skipLegacyRows && startsSafeSection) {
+        skipLegacyRows = false;
+      } else if (skipLegacyRows && trimmed) {
+        return false;
+      }
+
+      return !/[€]/.test(line);
+    })
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function buildReportText(visit = {}) {
   const note = String(visit.textNote || "").trim();
   const clientName = firstString(visit.clientName) || "Client à compléter";
@@ -311,7 +367,7 @@ function createVisit(overrides = {}) {
     photos: normalizePhotos({ photos: overrides.photos }, createdAt),
     voiceNote: normalizeVoiceNote(overrides.voiceNote),
     voiceTranscript: firstString(overrides.voiceTranscript),
-    report: firstString(overrides.report),
+    report: sanitizeLegacyReportText(firstString(overrides.report)),
     pdfGeneratedAt: overrides.pdfGeneratedAt || null,
 
     analyzedAt: overrides.analyzedAt || null,
@@ -339,7 +395,7 @@ function normalizeVisit(raw = {}) {
     photos: normalizePhotos(raw, createdAt),
     voiceNote: normalizeVoiceNote(raw.voiceNote),
     voiceTranscript: raw.voiceTranscript,
-    report: firstString(raw.report),
+    report: sanitizeLegacyReportText(firstString(raw.report)),
     pdfGeneratedAt: raw.pdfGeneratedAt || null,
   });
 
@@ -772,7 +828,7 @@ async function startVoiceRecording() {
     const denied = ["NotAllowedError", "SecurityError", "PermissionDeniedError"].includes(error?.name);
     setVoiceRecordStatus(
       denied
-        ? "Accès au micro refusé. Autorisez le micro dans les réglages du navigateur ou utilisez la note écrite."
+        ? "Accès au micro non autorisé. Autorisez le micro dans les réglages du navigateur ou utilisez la note écrite."
         : "Erreur pendant l'enregistrement. Réessayez ou utilisez la note écrite.",
       denied ? "denied" : "error",
     );
@@ -823,66 +879,12 @@ function getClientFirstName() {
 }
 
 function internalReportText(report) {
-  const rawReport = String(report || "").trim();
-  if (!rawReport) {
+  const cleanedReport = sanitizeLegacyReportText(report);
+  if (!cleanedReport) {
     return "Compte-rendu de visite : à générer avant transmission.";
   }
 
-  const legacySectionTerms = [
-    ["Post", "es financiers disponibles"].join(""),
-  ];
-  const legacyLineTerms = [
-    ["Montant", " estimatif"].join(""),
-    ["Sous", "-total"].join(""),
-    ["Total", " TTC"].join(""),
-    ["Pr", "ix et fournitures"].join(""),
-    ["Dimensions", " exactes"].join(""),
-    ["Contraintes", " techniques"].join(""),
-    ["Mat", "ériaux souhaités"].join(""),
-    ["Accès", " chantier"].join(""),
-    ["Délais", " souhaités"].join(""),
-    ["Informations", " manquantes"].join(""),
-  ].map((term) => term.toLowerCase());
-
-  let skipLegacyRows = false;
-  let skipLegacyChecklistRows = false;
-  const cleanedReport = rawReport
-    .split("\n")
-    .filter((line) => {
-      const trimmed = line.trim();
-      const startsNextSection = /^(Photos jointes|Informations pour traitement interne|Prochaine action)$/i.test(
-        trimmed,
-      );
-      const lowerLine = line.toLowerCase();
-
-      if (legacySectionTerms.some((term) => lowerLine.startsWith(term.toLowerCase()))) {
-        skipLegacyRows = true;
-        return false;
-      }
-
-      if (/^Points/i.test(trimmed)) {
-        skipLegacyChecklistRows = true;
-        return false;
-      }
-
-      if (skipLegacyRows && startsNextSection) {
-        skipLegacyRows = false;
-      } else if (skipLegacyRows) {
-        return false;
-      }
-
-      if (skipLegacyChecklistRows && /^Prochaine action$/i.test(trimmed)) {
-        skipLegacyChecklistRows = false;
-      } else if (skipLegacyChecklistRows) {
-        return false;
-      }
-
-      return !/[€]/.test(line) && !legacyLineTerms.some((term) => lowerLine.includes(term));
-    })
-    .join("\n")
-    .trim();
-
-  return `Compte-rendu de visite :\n${cleanedReport || "À générer avant transmission."}`;
+  return `Compte-rendu de visite :\n${cleanedReport}`;
 }
 
 function renderMessages() {
@@ -928,7 +930,7 @@ Dossier à traiter par l'équipe interne pour vérification et traitement.`;
 }
 
 function renderReport() {
-  const report = currentVisit()?.report;
+  const report = sanitizeLegacyReportText(currentVisit()?.report);
   if (!report) {
     elements.reportCard.innerHTML = `
       <p><strong>Compte-rendu de visite</strong></p>
@@ -1133,7 +1135,6 @@ elements.folderList.addEventListener("click", (event) => {
 });
 
 document.querySelector("#generateButton").addEventListener("click", analyzeVisit);
-document.querySelector("#generateButtonTop").addEventListener("click", analyzeVisit);
 
 elements.detailStatus.addEventListener("change", () => {
   persistDetailFields();
