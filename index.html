@@ -273,17 +273,19 @@
           <div class="panel-header compact">
             <div>
               <p class="eyebrow">Observation</p>
-              <h2 id="noteTitle">Note de visite</h2>
+              <h2 id="noteTitle">Notes de visite</h2>
+              <p>Ajoutez les informations importantes relevées sur place, par écrit ou par voix.</p>
             </div>
           </div>
 
           <div class="voice-box">
             <div class="voice-toolbar">
               <span class="icon-button active" aria-hidden="true">
-                <svg><use href="#icon-mic"></use></svg>
+                <svg><use href="#icon-file"></use></svg>
               </span>
-              <span>Note saisie pendant la visite</span>
+              <span>Note écrite</span>
             </div>
+            <p class="note-help">Décrivez la demande, les observations et les points à transmettre.</p>
             <textarea id="voiceNote">Cuisine et petite salle de bain à refaire. Reprise plomberie sous vasque, dépose ancien meuble, carrelage mural sur 8 m², peinture plafond et finitions. Appartement occupé, accès par ascenseur.</textarea>
           </div>
 
@@ -291,7 +293,7 @@
             <div class="audio-note-header">
               <div>
                 <h3 id="audioNoteTitle">Note vocale</h3>
-                <p>Enregistrez une note vocale complémentaire pour l'équipe interne.</p>
+                <p>Enregistrez rapidement vos observations si vous préférez parler plutôt qu'écrire.</p>
               </div>
               <span class="audio-status" id="voiceRecordStatus">Prêt à enregistrer</span>
             </div>
@@ -334,15 +336,15 @@
           <section class="panel actions-panel" aria-labelledby="actionsTitle">
             <div class="panel-header compact">
               <div>
-                <p class="eyebrow">Bureau</p>
-                <h2 id="actionsTitle">Transmettre le dossier</h2>
+                <p class="eyebrow">Équipe interne</p>
+                <h2 id="actionsTitle">Transmission interne</h2>
               </div>
             </div>
 
             <div class="tab-panel active" id="tab-message">
               <label class="field">
-                <span>Email du bureau / destinataire interne</span>
-                <input id="officeEmail" inputmode="email" placeholder="bureau@entreprise.fr" />
+                <span>Email équipe interne / destinataire</span>
+                <input id="officeEmail" inputmode="email" placeholder="interne@entreprise.fr" />
               </label>
               <label class="field">
                 <span>Message interne</span>
@@ -390,6 +392,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="app.js?v=v1-clean-field-flow-20260611"></script>
+    <script src="app.js?v=v1-notes-transmission-20260611"></script>
   </body>
 </html>

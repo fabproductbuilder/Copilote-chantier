@@ -591,6 +591,14 @@ h2 {
   font-weight: 800;
 }
 
+.note-help {
+  margin: 0;
+  padding: 10px 11px 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .voice-box textarea {
   min-height: 132px;
   resize: vertical;

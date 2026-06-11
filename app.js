@@ -254,6 +254,26 @@ function internalTreatmentInfoText(textNote) {
   return note || "À compléter à partir de la note de visite.";
 }
 
+function writtenNoteLabel(textNote) {
+  return String(textNote || "").trim() ? "présente" : "non renseignée";
+}
+
+function reportStatusLabel(report) {
+  return sanitizeLegacyReportText(report) ? "généré" : "à générer";
+}
+
+function contactStatusLabel({ phone, email }) {
+  return firstString(phone) && firstString(email) ? "complètes" : "à compléter";
+}
+
+function projectTypeStatusLabel(projectType) {
+  return firstString(projectType) ? "renseigné" : "à préciser";
+}
+
+function photoCountText(count) {
+  return `${count} photo${count > 1 ? "s" : ""}`;
+}
+
 function legacyBlockedTerms() {
   return [
     ["Post", "e"].join(""),
@@ -284,6 +304,9 @@ function sanitizeLegacyReportText(report) {
   let skipLegacyRows = false;
 
   return rawReport
+    .replace(/^Demande du client$/gim, "Demande / observations")
+    .replace(/^Chantier\s*:/gim, "Type d'intervention / chantier :")
+    .replace(/^Photos prises en compte\s*:/gim, "Nombre de photos :")
     .split("\n")
     .filter((line) => {
       const trimmed = line.trim();
@@ -310,6 +333,20 @@ function sanitizeLegacyReportText(report) {
     .trim();
 }
 
+function isCurrentReportFormat(report) {
+  const cleanedReport = sanitizeLegacyReportText(report);
+  return [
+    "Résumé de la visite",
+    "Demande / observations",
+    "Éléments collectés",
+    "Nombre de photos :",
+    "Note vocale :",
+    "Photos jointes",
+    "Informations pour traitement interne",
+    "Prochaine action",
+  ].every((term) => cleanedReport.includes(term));
+}
+
 function buildReportText(visit = {}) {
   const note = String(visit.textNote || "").trim();
   const clientName = firstString(visit.clientName) || "Client à compléter";
@@ -327,12 +364,11 @@ Type d'intervention / chantier : ${projectType}
 Localisation : ${address ? `${address}, ${city}` : city}
 Contact : ${phone} / ${email}
 
-Demande du client
+Demande / observations
 ${note}
 
 Éléments collectés
-Type d'intervention / chantier : ${projectType}
-Photos prises en compte : ${photos.length}
+Nombre de photos : ${photos.length}
 Note vocale : ${voiceNoteLabel(visit.voiceNote)}
 
 Photos jointes
@@ -399,8 +435,13 @@ function normalizeVisit(raw = {}) {
     pdfGeneratedAt: raw.pdfGeneratedAt || null,
   });
 
+  const report = normalized.report && !isCurrentReportFormat(normalized.report)
+    ? buildReportText(normalized)
+    : normalized.report;
+
   return {
     ...normalized,
+    report,
     createdAt,
     updatedAt: normalizeDate(raw.updatedAt, createdAt),
   };
@@ -889,48 +930,39 @@ function internalReportText(report) {
 
 function renderMessages() {
   const clientName = elements.clientName.value.trim() || "Client à compléter";
-  const city = elements.clientCity.value || "Ville à compléter";
   const email = elements.clientEmail.value.trim();
   const phone = elements.clientPhone.value.trim();
   const visit = currentVisit();
-  const projectType = projectTypeLabel(elements.projectTypeInput.value || visit?.projectType);
-  const reportStatus = visit?.report ? "- le compte-rendu généré ;" : "- le compte-rendu à générer ;";
-  const reportSection = internalReportText(visit?.report);
-  const internalInfo = internalTreatmentInfoText(elements.voiceNote.value || visit?.textNote);
+  const textNote = elements.voiceNote.value.trim();
+  const photos = photosForStorage();
+  const projectType = elements.projectTypeInput.value.trim() || visit?.projectType || "";
   const voiceStatus = voiceNoteLabel(visit?.voiceNote);
 
-  elements.clientMessage.value = `Objet : Compte-rendu visite chantier - ${clientName}
+  elements.clientMessage.value = `Objet : Dossier de visite à traiter - ${clientName}
 
 Bonjour,
 
-Voici le compte-rendu de la visite chantier réalisée chez ${clientName}.
+Voici le dossier de visite à traiter pour : ${clientName}.
 
-Le dossier contient :
-- les informations client ;
-- le type d'intervention / chantier ;
-- les notes de visite ;
-- la note vocale : ${voiceStatus} ;
-- les photos prises sur place ;
-${reportStatus}
-- les informations utiles au traitement interne.
+Éléments disponibles :
+- compte-rendu de visite : ${reportStatusLabel(visit?.report)} ;
+- note écrite : ${writtenNoteLabel(textNote)} ;
+- note vocale : ${voiceStatus} ;
+- photos : ${photoCountText(photos.length)} ;
+- coordonnées client : ${contactStatusLabel({ phone, email })} ;
+- type d'intervention / chantier : ${projectTypeStatusLabel(projectType)}.
 
-${reportSection}
+Prochaine action :
+Vérifier les informations collectées et préparer le traitement interne du dossier.
 
-Informations pour traitement interne :
-${internalInfo}
-
-Coordonnées client :
-${email ? `Email : ${email}` : "Email : à compléter"}
-${phone ? `Téléphone : ${phone}` : "Téléphone : à compléter"}
-Ville : ${city}
-Type d'intervention / chantier : ${projectType}
-Note vocale : ${voiceStatus}
-
-Dossier à traiter par l'équipe interne pour vérification et traitement.`;
+Le compte-rendu détaillé est disponible dans le bloc "Compte-rendu de visite".`;
 }
 
 function renderReport() {
-  const report = sanitizeLegacyReportText(currentVisit()?.report);
+  const visit = currentVisit();
+  const report = visit?.report && !isCurrentReportFormat(visit.report)
+    ? buildReportText(visit)
+    : sanitizeLegacyReportText(visit?.report);
   if (!report) {
     elements.reportCard.innerHTML = `
       <p><strong>Compte-rendu de visite</strong></p>
