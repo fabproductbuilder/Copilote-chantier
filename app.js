@@ -4,6 +4,7 @@ const DEFAULT_PHOTO = "assets/chantier-renovation.png";
 const MAX_PHOTOS_PER_VISIT = 8;
 const PHOTO_MAX_DIMENSION = 1400;
 const PHOTO_JPEG_QUALITY = 0.72;
+const MIN_REPORT_NOTE_LENGTH = 18;
 
 const visitStorage = {
   read(key) {
@@ -369,9 +370,66 @@ async function compressPhotoFile(file) {
   }
 }
 
-function buildReportText(textNote) {
-  const note = String(textNote || "").trim() || "Note chantier à compléter.";
-  return `Compte-rendu visite\n\n${note}\n\nPoints à confirmer : choix matériaux, quantités, planning, accès, évacuation gravats.`;
+function hasEnoughVisitNote(textNote) {
+  return String(textNote || "").trim().replace(/\s+/g, " ").length >= MIN_REPORT_NOTE_LENGTH;
+}
+
+function reportPhotoLabel(count) {
+  if (count === 0) return "Aucune photo jointe pour le moment.";
+  return `${photoLabel(count)} jointe${count > 1 ? "s" : ""} à la visite.`;
+}
+
+function quoteRowsForReport(rows = []) {
+  const validRows = rows.filter((row) => row?.label);
+  if (validRows.length === 0) {
+    return "Aucun poste financier détaillé pour le moment.";
+  }
+
+  return validRows
+    .slice(0, 5)
+    .map((row) => `- ${row.label} : ${row.qty || "1"} / ${euro.format(Number(row.total) || 0)}`)
+    .join("\n");
+}
+
+function buildReportText(visit = {}) {
+  const note = String(visit.textNote || "").trim();
+  const clientName = firstString(visit.clientName) || "Client à compléter";
+  const city = firstString(visit.city) || "Ville à compléter";
+  const address = firstString(visit.address);
+  const phone = firstString(visit.phone) || "Téléphone à compléter";
+  const email = firstString(visit.email) || "Email à compléter";
+  const projectType = visitTypeLabels[visit.projectType] || "Type de chantier à préciser";
+  const photos = Array.isArray(visit.photos) ? visit.photos : [];
+  const quoteRows = normalizeQuoteRows(visit.quoteRows);
+  const nextAction = visit.followupJ3
+    ? "Préparer une relance client à J+3 si le client n'a pas répondu."
+    : "Reprendre contact avec le client après envoi du pré-devis.";
+
+  return `Résumé de la visite
+Client : ${clientName}
+Chantier : ${projectType}
+Localisation : ${address ? `${address}, ${city}` : city}
+Contact : ${phone} / ${email}
+
+Demande du client
+${note}
+
+Éléments collectés
+Type de chantier : ${projectType}
+Postes financiers disponibles :
+${quoteRowsForReport(quoteRows)}
+
+Photos jointes
+${reportPhotoLabel(photos.length)}
+
+Points à vérifier
+- Quantités exactes avant envoi
+- Prix et fournitures à valider
+- Contraintes d'accès, protections et planning
+- Cohérence entre photos, note de visite et postes financiers
+
+Prochaine action
+${nextAction}`;
 }
 
 function createVisit(overrides = {}) {
@@ -395,7 +453,7 @@ function createVisit(overrides = {}) {
     photos: normalizePhotos({ photos: overrides.photos }, createdAt),
     voiceNote: overrides.voiceNote && typeof overrides.voiceNote === "object" ? overrides.voiceNote : null,
     voiceTranscript: firstString(overrides.voiceTranscript),
-    report: firstString(overrides.report) || buildReportText(textNote),
+    report: firstString(overrides.report),
     pdfGeneratedAt: overrides.pdfGeneratedAt || null,
 
     quoteRows: normalizeQuoteRows(overrides.quoteRows),
@@ -427,7 +485,7 @@ function normalizeVisit(raw = {}) {
     photos: normalizePhotos(raw, createdAt),
     voiceNote: raw.voiceNote && typeof raw.voiceNote === "object" ? raw.voiceNote : null,
     voiceTranscript: raw.voiceTranscript,
-    report: raw.report || buildReportText(textNote),
+    report: firstString(raw.report),
     pdfGeneratedAt: raw.pdfGeneratedAt || null,
     quoteRows: normalizeQuoteRows(raw.quoteRows || raw.rows),
   });
@@ -698,7 +756,6 @@ function persistDetailFields() {
     projectType: state.visitType,
     visitStatus: elements.detailStatus.value,
     textNote,
-    report: buildReportText(textNote),
     vatRate: elements.vatRate.value,
     autoFollowup: elements.autoFollowup.checked,
     followupJ3: elements.followupJ3.checked,
@@ -784,11 +841,34 @@ Bonne journée.`;
 }
 
 function renderReport() {
-  const note = elements.voiceNote.value.trim() || "Note chantier à compléter.";
+  const report = currentVisit()?.report;
+  if (!report) {
+    elements.reportCard.innerHTML = `
+      <p><strong>Compte-rendu de visite</strong></p>
+      <p>Ajoutez une note de visite, puis cliquez sur Générer le compte-rendu.</p>
+    `;
+    return;
+  }
+
+  elements.reportCard.innerHTML = report
+    .split(/\n{2,}/)
+    .map((block) => {
+      const [title, ...lines] = block.split("\n");
+      const content = lines.map((line) => escapeAttr(line)).join("<br />");
+      return `
+        <p>
+          <strong>${escapeAttr(title)}</strong>
+          ${content ? `<br />${content}` : ""}
+        </p>
+      `;
+    })
+    .join("");
+}
+
+function renderReportNotice(message) {
   elements.reportCard.innerHTML = `
-    <p><strong>Compte-rendu visite</strong></p>
-    <p>${escapeAttr(note)}</p>
-    <p><strong>Points à confirmer :</strong> choix matériaux, quantités, planning, accès, évacuation gravats.</p>
+    <p><strong>Compte-rendu de visite</strong></p>
+    <p>${escapeAttr(message)}</p>
   `;
 }
 
@@ -812,13 +892,36 @@ function showToast(message) {
 }
 
 function analyzeVisit() {
-  const rows = cloneRows(currentPreset().rows);
-  const textNote = elements.voiceNote.value;
+  const rows = currentQuoteRows();
+  const textNote = elements.voiceNote.value.trim();
+
+  persistDetailFields();
+
+  if (!hasEnoughVisitNote(textNote)) {
+    renderReportNotice("Ajoutez une note de visite plus détaillée avant de générer le compte-rendu.");
+    showToast("Note de visite à compléter avant génération");
+    return;
+  }
+
   state.analyzedAt = new Date();
+  const report = buildReportText({
+    ...currentVisit(),
+    clientName: elements.clientName.value.trim() || "Nouveau client",
+    phone: elements.clientPhone.value.trim(),
+    email: elements.clientEmail.value.trim(),
+    city: elements.clientCity.value.trim(),
+    projectType: state.visitType,
+    visitStatus: elements.detailStatus.value,
+    textNote,
+    photos: photosForStorage(),
+    quoteRows: rows,
+    followupJ3: elements.followupJ3.checked,
+  });
+
   updateVisit({
     projectType: state.visitType,
     textNote,
-    report: buildReportText(textNote),
+    report,
     quoteRows: rows,
     analyzedAt: state.analyzedAt.toISOString(),
   });
