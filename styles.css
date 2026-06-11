@@ -600,6 +600,68 @@ h2 {
   line-height: 1.45;
 }
 
+.audio-note {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: #f8fbfc;
+}
+
+.audio-note-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.audio-note h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.audio-note p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.audio-status {
+  flex: 0 0 auto;
+  max-width: 190px;
+  border-radius: 999px;
+  padding: 5px 8px;
+  background: #eef6ff;
+  color: #16467f;
+  font-size: 12px;
+  font-weight: 850;
+  text-align: right;
+}
+
+.audio-status[data-state="recording"] {
+  background: #fff0e6;
+  color: #924b13;
+}
+
+.audio-status[data-state="denied"],
+.audio-status[data-state="unsupported"],
+.audio-status[data-state="error"] {
+  border-radius: var(--radius);
+  background: #fff1f2;
+  color: #9f1239;
+}
+
+.audio-controls {
+  margin: 0;
+}
+
+.audio-note audio {
+  width: 100%;
+}
+
 .button {
   display: inline-flex;
   align-items: center;
@@ -612,6 +674,12 @@ h2 {
   font-weight: 850;
   text-align: center;
   white-space: nowrap;
+}
+
+.button.danger {
+  border-color: #f1b7c2;
+  background: #fff1f2;
+  color: #9f1239;
 }
 
 .button.primary {

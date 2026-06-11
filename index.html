@@ -283,12 +283,35 @@
 
           <div class="voice-box">
             <div class="voice-toolbar">
-              <button class="icon-button active" id="voiceButton" title="Dicter une note" type="button">
+              <span class="icon-button active" aria-hidden="true">
                 <svg><use href="#icon-mic"></use></svg>
-              </button>
+              </span>
               <span>Note saisie pendant la visite</span>
             </div>
             <textarea id="voiceNote">Cuisine et petite salle de bain à refaire. Reprise plomberie sous vasque, dépose ancien meuble, carrelage mural sur 8 m², peinture plafond et finitions. Appartement occupé, accès par ascenseur.</textarea>
+          </div>
+
+          <div class="audio-note" aria-labelledby="audioNoteTitle">
+            <div class="audio-note-header">
+              <div>
+                <h3 id="audioNoteTitle">Note vocale</h3>
+                <p>Enregistrez une note vocale complémentaire pour l'équipe interne.</p>
+              </div>
+              <span class="audio-status" id="voiceRecordStatus">Prêt à enregistrer</span>
+            </div>
+            <div class="button-row audio-controls">
+              <button class="button secondary" id="voiceRecordButton" type="button">
+                <svg><use href="#icon-mic"></use></svg>
+                Démarrer
+              </button>
+              <button class="button secondary" id="voiceStopButton" type="button" disabled>
+                Arrêter
+              </button>
+              <button class="button secondary danger" id="voiceDeleteButton" type="button" hidden>
+                Supprimer
+              </button>
+            </div>
+            <audio id="voiceAudioPlayer" controls hidden></audio>
           </div>
 
           <div class="button-row">
@@ -479,6 +502,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="app.js?v=v1-home-status-20260611"></script>
+    <script src="app.js?v=v1-local-voice-note-20260611"></script>
   </body>
 </html>

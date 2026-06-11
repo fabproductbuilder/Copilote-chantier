@@ -248,6 +248,11 @@ const elements = {
   lastUpdateValue: document.querySelector("#lastUpdateValue"),
   internalStatusValue: document.querySelector("#internalStatusValue"),
   nextAction: document.querySelector("#nextAction"),
+  voiceRecordButton: document.querySelector("#voiceRecordButton"),
+  voiceStopButton: document.querySelector("#voiceStopButton"),
+  voiceDeleteButton: document.querySelector("#voiceDeleteButton"),
+  voiceAudioPlayer: document.querySelector("#voiceAudioPlayer"),
+  voiceRecordStatus: document.querySelector("#voiceRecordStatus"),
 };
 
 const state = {
@@ -256,6 +261,13 @@ const state = {
   visitType: "renovation",
   analyzedAt: new Date(),
   photoQueue: Promise.resolve(),
+  audioRecorder: null,
+  audioStream: null,
+  audioChunks: [],
+  audioStartedAt: null,
+  audioVisitId: null,
+  audioStatusMessage: "",
+  audioStatusKind: "",
 };
 
 function createId() {
@@ -332,6 +344,27 @@ function normalizePhotos(raw = {}, createdAt) {
     .slice(0, MAX_PHOTOS_PER_VISIT);
 }
 
+function normalizeVoiceNote(rawVoiceNote) {
+  if (!rawVoiceNote || typeof rawVoiceNote !== "object") {
+    return null;
+  }
+
+  const dataUrl = firstString(rawVoiceNote.dataUrl);
+  if (!dataUrl || !dataUrl.startsWith("data:audio/")) {
+    return null;
+  }
+
+  const mimeType = firstString(rawVoiceNote.mimeType) || dataUrl.slice(5, dataUrl.indexOf(";")) || "audio/webm";
+  const durationSeconds = Number(rawVoiceNote.durationSeconds);
+
+  return {
+    dataUrl,
+    mimeType,
+    createdAt: normalizeDate(rawVoiceNote.createdAt),
+    ...(durationSeconds > 0 ? { durationSeconds: Math.round(durationSeconds) } : {}),
+  };
+}
+
 function photoLabel(count) {
   return count > 1 ? `${count} photos` : `${count} photo`;
 }
@@ -388,6 +421,10 @@ function reportPhotoLabel(count) {
   return `${photoLabel(count)} jointe${count > 1 ? "s" : ""} à la visite.`;
 }
 
+function voiceNoteLabel(voiceNote) {
+  return normalizeVoiceNote(voiceNote) ? "présente" : "non ajoutée";
+}
+
 function internalTreatmentInfoText(textNote) {
   const note = String(textNote || "").trim();
   return note || "À compléter à partir de la note de visite.";
@@ -416,6 +453,7 @@ ${note}
 Éléments collectés
 Type d'intervention / chantier : ${projectType}
 Photos prises en compte : ${photos.length}
+Note vocale : ${voiceNoteLabel(visit.voiceNote)}
 
 Photos jointes
 ${reportPhotoLabel(photos.length)}
@@ -447,7 +485,7 @@ function createVisit(overrides = {}) {
     visitStatus,
     textNote,
     photos: normalizePhotos({ photos: overrides.photos }, createdAt),
-    voiceNote: overrides.voiceNote && typeof overrides.voiceNote === "object" ? overrides.voiceNote : null,
+    voiceNote: normalizeVoiceNote(overrides.voiceNote),
     voiceTranscript: firstString(overrides.voiceTranscript),
     report: firstString(overrides.report),
     pdfGeneratedAt: overrides.pdfGeneratedAt || null,
@@ -480,7 +518,7 @@ function normalizeVisit(raw = {}) {
     visitStatus: raw.visitStatus || raw.status,
     textNote,
     photos: normalizePhotos(raw, createdAt),
-    voiceNote: raw.voiceNote && typeof raw.voiceNote === "object" ? raw.voiceNote : null,
+    voiceNote: normalizeVoiceNote(raw.voiceNote),
     voiceTranscript: raw.voiceTranscript,
     report: firstString(raw.report),
     pdfGeneratedAt: raw.pdfGeneratedAt || null,
@@ -707,7 +745,26 @@ function updateVisit(patch, shouldRenderHome = false) {
   }
 }
 
+function updateVisitById(id, patch) {
+  const index = state.visites.findIndex((item) => item.id === id);
+  if (index < 0) return null;
+
+  const updatedVisit = normalizeVisit({
+    ...state.visites[index],
+    ...patch,
+    updatedAt: nowIso(),
+  });
+  state.visites[index] = updatedVisit;
+  saveVisits();
+  return updatedVisit;
+}
+
 function hydrateDetail(visite) {
+  if (state.audioRecorder?.state === "recording") {
+    stopVoiceRecording();
+  }
+  state.audioStatusMessage = "";
+  state.audioStatusKind = "";
   state.visitType = visite.projectType || DEFAULT_PROJECT_TYPE;
   elements.clientName.value = visite.clientName || "";
   elements.clientCity.value = visite.city || "";
@@ -769,6 +826,201 @@ function renderPhotoGallery(photos = currentVisit()?.photos || []) {
 
 function photosForStorage() {
   return currentVisit()?.photos || [];
+}
+
+function isAudioRecordingSupported() {
+  return Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
+}
+
+function preferredAudioMimeType() {
+  if (!window.MediaRecorder?.isTypeSupported) {
+    return "";
+  }
+
+  return (
+    [
+      "audio/webm;codecs=opus",
+      "audio/webm",
+      "audio/mp4",
+      "audio/aac",
+    ].find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) || ""
+  );
+}
+
+function setVoiceRecordStatus(message, kind = "") {
+  state.audioStatusMessage = message;
+  state.audioStatusKind = kind;
+  elements.voiceRecordStatus.textContent = message;
+  elements.voiceRecordStatus.dataset.state = kind;
+}
+
+function stopAudioStream() {
+  state.audioStream?.getTracks().forEach((track) => track.stop());
+  state.audioStream = null;
+}
+
+function renderVoiceNote() {
+  const voiceNote = normalizeVoiceNote(currentVisit()?.voiceNote);
+  const isRecording = state.audioRecorder?.state === "recording";
+  const isSupported = isAudioRecordingSupported();
+
+  elements.voiceRecordButton.disabled = isRecording || !isSupported;
+  elements.voiceStopButton.disabled = !isRecording;
+  elements.voiceDeleteButton.hidden = !voiceNote || isRecording;
+  elements.voiceAudioPlayer.hidden = !voiceNote;
+
+  if (voiceNote) {
+    elements.voiceAudioPlayer.src = voiceNote.dataUrl;
+  } else {
+    elements.voiceAudioPlayer.removeAttribute("src");
+    elements.voiceAudioPlayer.load();
+  }
+
+  if (!isSupported) {
+    setVoiceRecordStatus(
+      "L'enregistrement audio n'est pas disponible sur ce navigateur. Vous pouvez utiliser la note écrite.",
+      "unsupported",
+    );
+    return;
+  }
+
+  if (isRecording) {
+    setVoiceRecordStatus("Enregistrement en cours…", "recording");
+    return;
+  }
+
+  if (state.audioStatusMessage) {
+    setVoiceRecordStatus(state.audioStatusMessage, state.audioStatusKind);
+    return;
+  }
+
+  setVoiceRecordStatus(voiceNote ? "Note vocale enregistrée." : "Prêt à enregistrer", voiceNote ? "saved" : "ready");
+}
+
+async function startVoiceRecording() {
+  if (!currentVisit()) {
+    showToast("Créez une visite avant d'enregistrer une note vocale");
+    return;
+  }
+
+  if (!isAudioRecordingSupported()) {
+    setVoiceRecordStatus(
+      "L'enregistrement audio n'est pas disponible sur ce navigateur. Vous pouvez utiliser la note écrite.",
+      "unsupported",
+    );
+    renderVoiceNote();
+    return;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mimeType = preferredAudioMimeType();
+    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+
+    state.audioStream = stream;
+    state.audioRecorder = recorder;
+    state.audioChunks = [];
+    state.audioStartedAt = Date.now();
+    state.audioVisitId = currentVisit()?.id || null;
+    state.audioStatusMessage = "";
+    state.audioStatusKind = "";
+
+    recorder.addEventListener("dataavailable", (event) => {
+      if (event.data?.size > 0) {
+        state.audioChunks.push(event.data);
+      }
+    });
+
+    recorder.addEventListener("stop", async () => {
+      const chunks = [...state.audioChunks];
+      const durationSeconds = state.audioStartedAt ? (Date.now() - state.audioStartedAt) / 1000 : undefined;
+      const recordedMimeType = recorder.mimeType || mimeType || chunks[0]?.type || "audio/webm";
+
+      stopAudioStream();
+      state.audioRecorder = null;
+      state.audioChunks = [];
+      state.audioStartedAt = null;
+      const audioVisitId = state.audioVisitId;
+      state.audioVisitId = null;
+
+      if (chunks.length === 0) {
+        setVoiceRecordStatus("Erreur pendant l'enregistrement. Réessayez ou utilisez la note écrite.", "error");
+        renderVoiceNote();
+        return;
+      }
+
+      try {
+        const audioBlob = new Blob(chunks, { type: recordedMimeType });
+        const dataUrl = await readFileAsDataUrl(audioBlob);
+        const voiceNote = {
+          dataUrl,
+          mimeType: recordedMimeType,
+          createdAt: nowIso(),
+          ...(durationSeconds ? { durationSeconds } : {}),
+        };
+        const updatedVisit = updateVisitById(audioVisitId, { voiceNote });
+        if (!updatedVisit) {
+          throw new Error("Visit not found for voice note");
+        }
+        if (audioVisitId === currentVisit()?.id) {
+          renderDetailMeta();
+          state.audioStatusMessage = "Note vocale enregistrée.";
+          state.audioStatusKind = "saved";
+          renderVoiceNote();
+          renderMessages();
+          showToast("Note vocale enregistrée.");
+        } else {
+          state.audioStatusMessage = "";
+          state.audioStatusKind = "";
+        }
+      } catch {
+        setVoiceRecordStatus("Erreur pendant l'enregistrement. Réessayez ou utilisez la note écrite.", "error");
+        renderVoiceNote();
+      }
+    });
+
+    recorder.addEventListener("error", () => {
+      stopAudioStream();
+      state.audioRecorder = null;
+      state.audioVisitId = null;
+      setVoiceRecordStatus("Erreur pendant l'enregistrement. Réessayez ou utilisez la note écrite.", "error");
+      renderVoiceNote();
+    });
+
+    recorder.start();
+    renderVoiceNote();
+  } catch (error) {
+    stopAudioStream();
+    state.audioRecorder = null;
+    state.audioVisitId = null;
+    const denied = ["NotAllowedError", "SecurityError", "PermissionDeniedError"].includes(error?.name);
+    setVoiceRecordStatus(
+      denied
+        ? "Accès au micro refusé. Autorisez le micro dans les réglages du navigateur ou utilisez la note écrite."
+        : "Erreur pendant l'enregistrement. Réessayez ou utilisez la note écrite.",
+      denied ? "denied" : "error",
+    );
+    renderVoiceNote();
+  }
+}
+function stopVoiceRecording() {
+  if (state.audioRecorder?.state === "recording") {
+    state.audioRecorder.stop();
+    elements.voiceStopButton.disabled = true;
+  }
+}
+
+function deleteVoiceNote() {
+  if (state.audioRecorder?.state === "recording") {
+    stopVoiceRecording();
+  }
+
+  updateVisit({ voiceNote: null });
+  state.audioStatusMessage = "";
+  state.audioStatusKind = "";
+  renderVoiceNote();
+  renderMessages();
+  showToast("Note vocale supprimée");
 }
 
 function persistDetailFields() {
@@ -894,6 +1146,7 @@ function renderMessages() {
   const reportStatus = visit?.report ? "- le compte-rendu généré ;" : "- le compte-rendu à générer ;";
   const reportSection = internalReportText(visit?.report);
   const internalInfo = internalTreatmentInfoText(elements.voiceNote.value || visit?.textNote);
+  const voiceStatus = voiceNoteLabel(visit?.voiceNote);
 
   elements.clientMessage.value = `Objet : Compte-rendu visite chantier - ${clientName}
 
@@ -905,6 +1158,7 @@ Le dossier contient :
 - les informations client ;
 - le type d'intervention / chantier ;
 - les notes de visite ;
+- la note vocale : ${voiceStatus} ;
 - les photos prises sur place ;
 ${reportStatus}
 - les informations utiles au traitement interne.
@@ -919,6 +1173,7 @@ ${email ? `Email : ${email}` : "Email : à compléter"}
 ${phone ? `Téléphone : ${phone}` : "Téléphone : à compléter"}
 Ville : ${city}
 Type d'intervention / chantier : ${projectType}
+Note vocale : ${voiceStatus}
 
 Dossier à traiter par l'équipe interne pour vérification et préparation du devis.`;
 
@@ -961,6 +1216,7 @@ function renderAll() {
   const preset = currentPreset();
   const rows = currentQuoteRows();
   renderPhotoGallery();
+  renderVoiceNote();
   renderDetected(preset);
   renderQuoteRows(rows);
   renderTotals(rows);
@@ -1244,13 +1500,9 @@ elements.copyWhatsappButton.addEventListener("click", async () => {
 elements.prepareEmailButton.addEventListener("click", prepareEmailAndPdf);
 document.querySelector("#printButton").addEventListener("click", () => window.print());
 
-document.querySelector("#voiceButton").addEventListener("click", () => {
-  elements.voiceNote.value =
-    "Salle de bain à refaire après dégât des eaux. Prévoir protection escalier, reprise support, plomberie sous vasque, joints et peinture plafond.";
-  renderReport();
-  persistDetailFields();
-  showToast("Note de visite ajoutée");
-});
+elements.voiceRecordButton.addEventListener("click", startVoiceRecording);
+elements.voiceStopButton.addEventListener("click", stopVoiceRecording);
+elements.voiceDeleteButton.addEventListener("click", deleteVoiceNote);
 
 document.querySelector("#pdfInputButton").addEventListener("click", () => {
   showToast("Ajout de plan à prévoir plus tard");
