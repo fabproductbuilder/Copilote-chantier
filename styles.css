@@ -124,6 +124,23 @@ svg {
   gap: 8px;
 }
 
+.print-action {
+  display: grid;
+  gap: 4px;
+  max-width: 360px;
+}
+
+.print-action .button {
+  justify-content: center;
+}
+
+.print-action p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 body[data-view="home"] .detail-only {
   display: none;
 }
@@ -1213,6 +1230,15 @@ h2 {
     white-space: normal;
   }
 
+  .print-action {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+
+  .print-action .button {
+    width: 100%;
+  }
+
   .workspace,
   .side-stack {
     grid-template-columns: 1fr;
@@ -1342,6 +1368,7 @@ h2 {
     padding-bottom: 8mm;
     border-bottom: 1px solid #111;
     break-inside: avoid;
+    page-break-inside: avoid;
   }
 
   .print-brand {
@@ -1356,12 +1383,21 @@ h2 {
     margin: 0 0 3mm;
     font-size: 22pt;
     line-height: 1.15;
+    break-after: avoid;
+    page-break-after: avoid;
   }
 
   .print-header p,
   .print-date span {
     margin: 0;
     color: #444;
+  }
+
+  .print-header .print-subtitle {
+    margin: 0 0 2mm;
+    color: #111;
+    font-size: 11pt;
+    font-weight: 700;
   }
 
   .print-date {
@@ -1387,6 +1423,23 @@ h2 {
     padding-bottom: 2mm;
     border-bottom: 1px solid #ccc;
     font-size: 15pt;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .print-section-title {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .print-report-block {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .print-photos-block {
+    break-inside: auto;
+    page-break-inside: auto;
   }
 
   .print-info-grid {
@@ -1416,11 +1469,14 @@ h2 {
   .print-report-section {
     margin: 0 0 5mm;
     break-inside: avoid;
+    page-break-inside: avoid;
   }
 
   .print-report-section h3 {
     margin: 0 0 2mm;
     font-size: 12pt;
+    break-after: avoid;
+    page-break-after: avoid;
   }
 
   .print-report-section p,
@@ -1433,6 +1489,8 @@ h2 {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 6mm;
+    break-before: avoid;
+    page-break-before: avoid;
   }
 
   .print-photo-grid figure {
@@ -1444,7 +1502,7 @@ h2 {
   .print-photo-grid img {
     display: block;
     width: 100%;
-    max-height: 80mm;
+    max-height: 72mm;
     border: 1px solid #bbb;
     object-fit: cover;
   }

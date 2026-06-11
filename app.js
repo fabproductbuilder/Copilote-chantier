@@ -252,7 +252,9 @@ function voiceNoteLabel(voiceNote) {
 
 function internalTreatmentInfoText(textNote) {
   const note = String(textNote || "").trim();
-  return note || "À compléter à partir de la note de visite.";
+  return note
+    ? "Les informations collectées pendant la visite sont à vérifier par l'équipe interne."
+    : "À compléter à partir de la note de visite.";
 }
 
 function writtenNoteLabel(textNote) {
@@ -334,8 +336,43 @@ function sanitizeLegacyReportText(report) {
     .trim();
 }
 
-function isCurrentReportFormat(report) {
+function comparableText(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+function polishReportText(report) {
   const cleanedReport = sanitizeLegacyReportText(report);
+  if (!cleanedReport) return "";
+
+  const blocks = cleanedReport.split(/\n{2,}/);
+  const demandBlock = blocks.find((block) => /^Demande \/ observations/i.test(block.trim()));
+  const demandText = demandBlock ? demandBlock.split("\n").slice(1).join(" ") : "";
+
+  return blocks
+    .map((block) => {
+      const lines = block.split("\n");
+      const title = lines[0]?.trim() || "";
+      const content = lines.slice(1).join(" ");
+
+      if (
+        /^Informations pour traitement interne$/i.test(title) &&
+        comparableText(content) &&
+        comparableText(content) === comparableText(demandText)
+      ) {
+        return `${title}\n${internalTreatmentInfoText(content)}`;
+      }
+
+      return block;
+    })
+    .join("\n\n")
+    .trim();
+}
+
+function isCurrentReportFormat(report) {
+  const cleanedReport = polishReportText(report);
   return [
     "Résumé de la visite",
     "Demande / observations",
@@ -493,6 +530,17 @@ function formatPrintDate(dateLike = new Date()) {
   return new Intl.DateTimeFormat("fr-FR", {
     dateStyle: "long",
     timeStyle: "short",
+  }).format(validDate);
+}
+
+function formatShortDate(dateLike = new Date()) {
+  const date = new Date(dateLike);
+  const validDate = Number.isNaN(date.getTime()) ? new Date() : date;
+
+  return new Intl.DateTimeFormat("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
   }).format(validDate);
 }
 
@@ -934,7 +982,7 @@ function getClientFirstName() {
 }
 
 function internalReportText(report) {
-  const cleanedReport = sanitizeLegacyReportText(report);
+  const cleanedReport = polishReportText(report);
   if (!cleanedReport) {
     return "Compte-rendu de visite : à générer avant transmission.";
   }
@@ -976,7 +1024,7 @@ function renderReport() {
   const visit = currentVisit();
   const report = visit?.report && !isCurrentReportFormat(visit.report)
     ? buildReportText(visit)
-    : sanitizeLegacyReportText(visit?.report);
+    : polishReportText(visit?.report);
   if (!report) {
     elements.reportCard.innerHTML = `
       <p><strong>Compte-rendu de visite</strong></p>
@@ -1008,20 +1056,20 @@ function renderReportNotice(message) {
 }
 
 function printableReportHtml(visite) {
-  const report = sanitizeLegacyReportText(visite?.report);
+  const report = polishReportText(visite?.report);
 
   if (!report) {
     return `
-      <div class="print-block">
-        <h2>Compte-rendu de visite</h2>
+      <div class="print-block print-report-block">
+        <h2 class="print-section-title">Compte-rendu de visite</h2>
         <p>Compte-rendu de visite : à générer avant impression finale.</p>
       </div>
     `;
   }
 
   return `
-    <div class="print-block">
-      <h2>Compte-rendu de visite</h2>
+    <div class="print-block print-report-block">
+      <h2 class="print-section-title">Compte-rendu de visite</h2>
       ${report
         .split(/\n{2,}/)
         .map((block) => {
@@ -1044,16 +1092,16 @@ function printablePhotosHtml(visite) {
 
   if (photos.length === 0) {
     return `
-      <div class="print-block">
-        <h2>Photos de visite</h2>
+      <div class="print-block print-photos-block">
+        <h2 class="print-section-title">Photos de visite</h2>
         <p>Aucune photo ajoutée pour cette visite.</p>
       </div>
     `;
   }
 
   return `
-    <div class="print-block">
-      <h2>Photos de visite</h2>
+    <div class="print-block print-photos-block">
+      <h2 class="print-section-title">Photos de visite</h2>
       <div class="print-photo-grid">
         ${photos
           .map(
@@ -1085,6 +1133,7 @@ function renderPrintDossier() {
   const address = firstString(visite.address);
   const location = address ? `${address}, ${city}` : city;
   const projectType = projectTypeLabel(visite.projectType);
+  const dossierDate = formatShortDate(visite.createdAt || visite.updatedAt || new Date());
   const nextActionLabel = visite.report
     ? "À traiter par l'équipe interne"
     : "Compte-rendu à générer avant transmission";
@@ -1092,8 +1141,9 @@ function renderPrintDossier() {
   elements.printDossier.innerHTML = `
     <header class="print-header">
       <div>
-        <p class="print-brand">Copilote Chantier</p>
+        <p class="print-brand">COPILOTE CHANTIER</p>
         <h1>Dossier de visite chantier</h1>
+        <p class="print-subtitle">Dossier : ${escapeAttr(clientName)} — ${escapeAttr(location)} — ${escapeAttr(dossierDate)}</p>
         <p>Document interne pour traitement du dossier.</p>
       </div>
       <div class="print-date">

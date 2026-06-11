@@ -80,10 +80,13 @@
             <svg><use href="#icon-plus"></use></svg>
             Nouvelle visite
           </button>
-          <button class="button secondary detail-only" id="printButton" type="button">
-            <svg><use href="#icon-print"></use></svg>
-            Imprimer / Enregistrer en PDF
-          </button>
+          <div class="print-action detail-only">
+            <button class="button secondary" id="printButton" type="button">
+              <svg><use href="#icon-print"></use></svg>
+              Imprimer / Enregistrer en PDF
+            </button>
+            <p>Dans l'aperçu d'impression, vous pouvez choisir "Enregistrer en PDF". Pour un rendu plus propre, désactivez les en-têtes et pieds de page du navigateur.</p>
+          </div>
         </div>
       </header>
 
@@ -394,6 +397,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="app.js?v=v1-print-dossier-20260611"></script>
+    <script src="app.js?v=v1-print-polish-20260611"></script>
   </body>
 </html>
