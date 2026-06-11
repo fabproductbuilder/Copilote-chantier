@@ -319,10 +319,6 @@
               <svg><use href="#icon-zap"></use></svg>
               Générer le compte-rendu
             </button>
-            <button class="button secondary" id="pdfInputButton" type="button" hidden>
-              <svg><use href="#icon-file"></use></svg>
-              Plan
-            </button>
           </div>
         </section>
 
@@ -336,82 +332,6 @@
           <div class="report-card" id="reportCard"></div>
         </section>
 
-        <section class="panel quote-panel" aria-labelledby="quoteTitle" hidden>
-          <div class="panel-header quote-heading">
-            <div>
-              <p class="eyebrow">Traitement bureau</p>
-              <h2 id="quoteTitle">Informations pour traitement interne</h2>
-            </div>
-            <div class="analysis-card" aria-label="Informations pour traitement interne">
-              <div class="analysis-card-main">
-                <span>Dossier bureau</span>
-                <strong>Depuis la note</strong>
-              </div>
-              <p>Les informations transmises au bureau reprennent ce que l'artisan a saisi dans la note de visite.</p>
-            </div>
-          </div>
-
-          <div class="detected-list" id="detectedList"></div>
-
-          <div class="quote-tools" hidden>
-            <span>Postes modifiables avant validation</span>
-            <button class="button secondary" id="addQuoteRow" type="button">
-              <svg><use href="#icon-plus"></use></svg>
-              Ajouter poste
-            </button>
-          </div>
-
-          <div class="quote-table" aria-label="Lignes du pré-devis" hidden>
-            <div class="quote-row quote-head">
-              <span>Poste</span>
-              <span>Qté</span>
-              <span>Prix</span>
-            </div>
-            <div id="quoteRows"></div>
-          </div>
-
-          <div class="totals" hidden>
-            <div>
-              <span>Sous-total</span>
-              <strong id="subtotalValue">0 €</strong>
-            </div>
-            <div class="vat-control">
-              <span>TVA</span>
-              <select id="vatRate">
-                <option value="0.1">10%</option>
-                <option value="0.2">20%</option>
-              </select>
-            </div>
-            <div class="grand-total">
-              <span>Total TTC</span>
-              <strong id="totalValue">0 €</strong>
-            </div>
-          </div>
-
-          <div class="timeline">
-            <div class="timeline-item done">
-              <svg><use href="#icon-check"></use></svg>
-              <div>
-                <strong>Photos de visite</strong>
-                <span>Éléments gardés dans la visite client</span>
-              </div>
-            </div>
-            <div class="timeline-item done">
-              <svg><use href="#icon-check"></use></svg>
-              <div>
-                <strong>Points à confirmer</strong>
-                <span>Accès, protections, matériaux et planning</span>
-              </div>
-            </div>
-            <div class="timeline-item">
-              <svg><use href="#icon-clock"></use></svg>
-              <div>
-                <strong>Traitement bureau</strong>
-                <span>Compléter les informations manquantes avant préparation du devis</span>
-              </div>
-            </div>
-          </div>
-        </section>
         </div>
 
         <aside class="side-stack">
@@ -423,13 +343,6 @@
               </div>
             </div>
 
-            <input id="autoFollowup" type="checkbox" checked hidden />
-
-            <div class="tabs" role="tablist" aria-label="Sorties" hidden>
-              <button class="tab active" data-tab="message" type="button">Message</button>
-              <button class="tab" data-tab="materials" type="button">Matériaux</button>
-            </div>
-
             <div class="tab-panel active" id="tab-message">
               <label class="field">
                 <span>Email du bureau / destinataire interne</span>
@@ -439,33 +352,12 @@
                 <span>Message interne</span>
               </label>
               <textarea id="clientMessage" class="message-text"></textarea>
-              <textarea id="whatsappMessage" class="message-text compact-message" readonly hidden></textarea>
               <div class="button-row">
                 <button class="button primary stretch" id="prepareEmailButton" type="button">
                   <svg><use href="#icon-send"></use></svg>
                   Préparer l'envoi du dossier
                 </button>
-                <button class="button secondary" id="copyWhatsappButton" type="button" hidden>
-                  <svg><use href="#icon-copy"></use></svg>
-                  Copier message interne
-                </button>
               </div>
-
-              <div class="followup-plan" hidden>
-                <span>Rappels internes</span>
-                <label>
-                  <input id="followupJ3" type="checkbox" checked />
-                  J+3
-                </label>
-                <label>
-                  <input id="followupJ7" type="checkbox" checked />
-                  J+7
-                </label>
-              </div>
-            </div>
-
-            <div class="tab-panel" id="tab-materials" hidden>
-              <ul class="materials-list" id="materialsList"></ul>
             </div>
           </section>
 
@@ -502,6 +394,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="app.js?v=v1-local-voice-note-20260611"></script>
+    <script src="app.js?v=v1-clean-field-flow-20260611"></script>
   </body>
 </html>

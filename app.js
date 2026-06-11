@@ -21,12 +21,6 @@ const visitStorage = {
   },
 };
 
-const euro = new Intl.NumberFormat("fr-FR", {
-  style: "currency",
-  currency: "EUR",
-  maximumFractionDigits: 0,
-});
-
 const visitTypeLabels = {
   renovation: "Rénovation",
   plomberie: "Plomberie",
@@ -41,157 +35,6 @@ const statusLabels = {
 
 const DEFAULT_PROJECT_TYPE = "";
 const DEFAULT_VISIT_STATUS = "draft";
-
-const visitPresets = {
-  renovation: {
-    detected: [
-      "Dépose meuble vasque",
-      "Reprise évacuation",
-      "Carrelage mural",
-      "Peinture plafond",
-      "Protection logement",
-    ],
-    rows: [
-      {
-        label: "Protection et préparation chantier",
-        detail: "Sol, ascenseur, circulation appartement occupé",
-        qty: "1",
-        total: 340,
-      },
-      {
-        label: "Dépose meuble vasque et évacuation",
-        detail: "Retrait propre, mise en sacs, dépôt gravats",
-        qty: "1",
-        total: 420,
-      },
-      {
-        label: "Reprise plomberie sous vasque",
-        detail: "Alimentation, évacuation, raccords et test étanchéité",
-        qty: "1",
-        total: 680,
-      },
-      {
-        label: "Pose carrelage mural",
-        detail: "Support à reprendre, fourniture standard incluse",
-        qty: "8 m²",
-        total: 1120,
-      },
-      {
-        label: "Peinture plafond et finitions",
-        detail: "Préparation, sous-couche, deux passes",
-        qty: "1",
-        total: 520,
-      },
-      {
-        label: "Provision ajustements",
-        detail: "Petites reprises découvertes après dépose",
-        qty: "1",
-        total: 310,
-      },
-    ],
-    materials: [
-      ["Bâches et adhésifs de protection", "1 lot"],
-      ["Raccords PER/cuivre et siphon", "1 kit"],
-      ["Carrelage mural", "8 m²"],
-      ["Colle, joints et primaire", "1 lot"],
-      ["Peinture pièce humide", "2,5 L"],
-    ],
-  },
-  plomberie: {
-    detected: [
-      "Fuite probable",
-      "Remplacement siphon",
-      "Raccords à reprendre",
-      "Test pression",
-    ],
-    rows: [
-      {
-        label: "Diagnostic et déplacement",
-        detail: "Contrôle visuel, accès sous vasque, recherche fuite",
-        qty: "1",
-        total: 120,
-      },
-      {
-        label: "Dépose ancien raccordement",
-        detail: "Démontage siphon, flexible et joints usés",
-        qty: "1",
-        total: 165,
-      },
-      {
-        label: "Remplacement évacuation vasque",
-        detail: "Siphon, bonde, raccords, étanchéité",
-        qty: "1",
-        total: 310,
-      },
-      {
-        label: "Reprise alimentations",
-        detail: "Flexibles, vannes d'arrêt, mise en pression",
-        qty: "2",
-        total: 260,
-      },
-      {
-        label: "Essais et nettoyage",
-        detail: "Test écoulement, contrôle fuite, remise propre",
-        qty: "1",
-        total: 95,
-      },
-    ],
-    materials: [
-      ["Siphon gain de place", "1"],
-      ["Bonde clic-clac", "1"],
-      ["Flexibles inox", "2"],
-      ["Joints et téflon", "1 lot"],
-      ["Vannes d'arrêt", "2"],
-    ],
-  },
-  peinture: {
-    detected: [
-      "Plafond pièce humide",
-      "Support à reprendre",
-      "Angles fissurés",
-      "Protection mobilier",
-    ],
-    rows: [
-      {
-        label: "Protection appartement",
-        detail: "Bâchage, masquage, circulation",
-        qty: "1",
-        total: 180,
-      },
-      {
-        label: "Préparation supports",
-        detail: "Lessivage, rebouchage, ponçage local",
-        qty: "18 m²",
-        total: 540,
-      },
-      {
-        label: "Sous-couche isolante",
-        detail: "Plafond et zones humides",
-        qty: "18 m²",
-        total: 360,
-      },
-      {
-        label: "Peinture finition satinée",
-        detail: "Deux couches, pièce humide",
-        qty: "18 m²",
-        total: 610,
-      },
-      {
-        label: "Nettoyage et reprise",
-        detail: "Retrait masquage, retouches, évacuation",
-        qty: "1",
-        total: 120,
-      },
-    ],
-    materials: [
-      ["Enduit de rebouchage", "2 kg"],
-      ["Abrasifs", "1 lot"],
-      ["Sous-couche anti-humidité", "5 L"],
-      ["Peinture satinée", "5 L"],
-      ["Masquage et bâches", "1 lot"],
-    ],
-  },
-};
 
 const elements = {
   homeView: document.querySelector("#homeView"),
@@ -225,26 +68,14 @@ const elements = {
   detailStatus: document.querySelector("#detailStatus"),
   detailStatusPill: document.querySelector("#detailStatusPill"),
   voiceNote: document.querySelector("#voiceNote"),
-  detectedList: document.querySelector("#detectedList"),
-  quoteRows: document.querySelector("#quoteRows"),
-  addQuoteRow: document.querySelector("#addQuoteRow"),
-  subtotalValue: document.querySelector("#subtotalValue"),
-  totalValue: document.querySelector("#totalValue"),
-  vatRate: document.querySelector("#vatRate"),
   clientMessage: document.querySelector("#clientMessage"),
-  whatsappMessage: document.querySelector("#whatsappMessage"),
   prepareEmailButton: document.querySelector("#prepareEmailButton"),
-  copyWhatsappButton: document.querySelector("#copyWhatsappButton"),
-  materialsList: document.querySelector("#materialsList"),
   reportCard: document.querySelector("#reportCard"),
   toast: document.querySelector("#toast"),
   mainPhoto: document.querySelector("#mainPhoto"),
   photoCount: document.querySelector("#photoCount"),
   photoGallery: document.querySelector("#photoGallery"),
   photoInput: document.querySelector("#photoInput"),
-  autoFollowup: document.querySelector("#autoFollowup"),
-  followupJ3: document.querySelector("#followupJ3"),
-  followupJ7: document.querySelector("#followupJ7"),
   lastUpdateValue: document.querySelector("#lastUpdateValue"),
   internalStatusValue: document.querySelector("#internalStatusValue"),
   nextAction: document.querySelector("#nextAction"),
@@ -308,14 +139,7 @@ function firstString(...values) {
 }
 
 function normalizeQuoteRows(rawRows) {
-  const rows = Array.isArray(rawRows) && rawRows.length > 0 ? rawRows : [];
-
-  return rows.map((row) => ({
-    label: row.label || "Poste à préciser",
-    detail: row.detail || "",
-    qty: row.qty || "1",
-    total: Number(row.total) || 0,
-  }));
+  return [];
 }
 
 function normalizePhoto(photo, index, createdAt) {
@@ -439,7 +263,7 @@ function buildReportText(visit = {}) {
   const email = firstString(visit.email) || "Email à compléter";
   const projectType = projectTypeLabel(visit.projectType);
   const photos = Array.isArray(visit.photos) ? visit.photos : [];
-  const nextAction = "Préparer la transmission du dossier pour traitement interne et préparation du devis.";
+  const nextAction = "Préparer la transmission du dossier pour traitement interne.";
 
   return `Résumé de la visite
 Client : ${clientName}
@@ -490,11 +314,6 @@ function createVisit(overrides = {}) {
     report: firstString(overrides.report),
     pdfGeneratedAt: overrides.pdfGeneratedAt || null,
 
-    quoteRows: normalizeQuoteRows(overrides.quoteRows),
-    vatRate: overrides.vatRate || "0.1",
-    autoFollowup: overrides.autoFollowup ?? true,
-    followupJ3: overrides.followupJ3 ?? true,
-    followupJ7: overrides.followupJ7 ?? true,
     analyzedAt: overrides.analyzedAt || null,
   };
 }
@@ -522,7 +341,6 @@ function normalizeVisit(raw = {}) {
     voiceTranscript: raw.voiceTranscript,
     report: firstString(raw.report),
     pdfGeneratedAt: raw.pdfGeneratedAt || null,
-    quoteRows: normalizeQuoteRows(raw.quoteRows || raw.rows),
   });
 
   return {
@@ -558,26 +376,6 @@ function currentVisit() {
   return state.visites.find((visite) => visite.id === state.currentId) || null;
 }
 
-function currentPreset() {
-  return visitPresets[state.visitType] || visitPresets.renovation;
-}
-
-function currentQuoteRows() {
-  const visite = currentVisit();
-  if (visite?.quoteRows?.length) {
-    return visite.quoteRows;
-  }
-  return cloneRows(currentPreset().rows);
-}
-
-function storedQuoteRows() {
-  return currentVisit()?.quoteRows || [];
-}
-
-function sumRows(rows) {
-  return rows.reduce((total, row) => total + (Number(row.total) || 0), 0);
-}
-
 function formatDate(dateLike) {
   const date = new Date(dateLike);
   if (Number.isNaN(date.getTime())) return "Aujourd'hui";
@@ -587,16 +385,6 @@ function formatDate(dateLike) {
     month: "short",
     hour: "2-digit",
     minute: "2-digit",
-  }).format(date);
-}
-
-function addDays(dateLike, days) {
-  const date = new Date(dateLike);
-  if (Number.isNaN(date.getTime())) return "";
-  date.setDate(date.getDate() + days);
-  return new Intl.DateTimeFormat("fr-FR", {
-    day: "2-digit",
-    month: "short",
   }).format(date);
 }
 
@@ -630,14 +418,6 @@ function dossierStatus(visite = {}) {
     label: "À compléter",
     className: "status-draft",
   };
-}
-
-function parseAmount(value) {
-  const normalized = String(value || "")
-    .replace(/\s/g, "")
-    .replace(",", ".")
-    .replace(/[^\d.]/g, "");
-  return Number(normalized) || 0;
 }
 
 function escapeAttr(value) {
@@ -774,10 +554,6 @@ function hydrateDetail(visite) {
   elements.projectTypeInput.value = projectTypeLabel(visite.projectType) === "Type d'intervention à préciser" ? "" : projectTypeLabel(visite.projectType);
   elements.detailStatus.value = visite.visitStatus || DEFAULT_VISIT_STATUS;
   elements.voiceNote.value = visite.textNote || "";
-  elements.vatRate.value = visite.vatRate || "0.1";
-  elements.autoFollowup.checked = visite.autoFollowup ?? true;
-  elements.followupJ3.checked = visite.followupJ3 ?? true;
-  elements.followupJ7.checked = visite.followupJ7 ?? true;
   renderPhotoGallery(visite.photos);
 
   renderAll();
@@ -1036,48 +812,9 @@ function persistDetailFields() {
     projectType,
     visitStatus: elements.detailStatus.value,
     textNote,
-    vatRate: elements.vatRate.value,
-    autoFollowup: elements.autoFollowup.checked,
-    followupJ3: elements.followupJ3.checked,
-    followupJ7: elements.followupJ7.checked,
-    quoteRows: storedQuoteRows(),
     photos: photosForStorage(),
   });
   renderDetailMeta();
-}
-
-function renderDetected() {
-  elements.detectedList.innerHTML = `<p>${escapeAttr(internalTreatmentInfoText(elements.voiceNote.value))}</p>`;
-}
-
-function renderQuoteRows(rows) {
-  elements.quoteRows.innerHTML = rows
-    .map(
-      (row, index) => `
-        <div class="quote-row quote-row-editable" data-quote-index="${index}">
-          <span class="quote-item">
-            <input data-quote-field="label" value="${escapeAttr(row.label)}" aria-label="Poste ${index + 1}" />
-            <input data-quote-field="detail" value="${escapeAttr(row.detail || "")}" aria-label="Détail poste ${index + 1}" />
-          </span>
-          <input class="qty" data-quote-field="qty" value="${escapeAttr(row.qty)}" aria-label="Quantité poste ${index + 1}" />
-          <input class="line-total" data-quote-field="total" inputmode="decimal" value="${escapeAttr(row.total)}" aria-label="Prix poste ${index + 1}" />
-        </div>
-      `,
-    )
-    .join("");
-}
-
-function renderTotals(rows = currentQuoteRows()) {
-  const subtotal = sumRows(rows);
-  const vat = Number(elements.vatRate.value);
-  elements.subtotalValue.textContent = euro.format(subtotal);
-  elements.totalValue.textContent = euro.format(subtotal * (1 + vat));
-}
-
-function renderMaterials(preset) {
-  elements.materialsList.innerHTML = preset.materials
-    .map(([name, quantity]) => `<li><strong>${name}</strong><span>${quantity}</span></li>`)
-    .join("");
 }
 
 function getClientFirstName() {
@@ -1091,7 +828,23 @@ function internalReportText(report) {
     return "Compte-rendu de visite : à générer avant transmission.";
   }
 
-  let skipLegacyFinancialRows = false;
+  const legacySectionTerms = [
+    ["Post", "es financiers disponibles"].join(""),
+  ];
+  const legacyLineTerms = [
+    ["Montant", " estimatif"].join(""),
+    ["Sous", "-total"].join(""),
+    ["Total", " TTC"].join(""),
+    ["Pr", "ix et fournitures"].join(""),
+    ["Dimensions", " exactes"].join(""),
+    ["Contraintes", " techniques"].join(""),
+    ["Mat", "ériaux souhaités"].join(""),
+    ["Accès", " chantier"].join(""),
+    ["Délais", " souhaités"].join(""),
+    ["Informations", " manquantes"].join(""),
+  ].map((term) => term.toLowerCase());
+
+  let skipLegacyRows = false;
   let skipLegacyChecklistRows = false;
   const cleanedReport = rawReport
     .split("\n")
@@ -1100,20 +853,21 @@ function internalReportText(report) {
       const startsNextSection = /^(Photos jointes|Informations pour traitement interne|Prochaine action)$/i.test(
         trimmed,
       );
+      const lowerLine = line.toLowerCase();
 
-      if (/^Postes financiers disponibles\s*:?$/i.test(trimmed)) {
-        skipLegacyFinancialRows = true;
+      if (legacySectionTerms.some((term) => lowerLine.startsWith(term.toLowerCase()))) {
+        skipLegacyRows = true;
         return false;
       }
 
-      if (/^Points à vérifier( pour le devis)?\s*:?$/i.test(trimmed)) {
+      if (/^Points/i.test(trimmed)) {
         skipLegacyChecklistRows = true;
         return false;
       }
 
-      if (skipLegacyFinancialRows && startsNextSection) {
-        skipLegacyFinancialRows = false;
-      } else if (skipLegacyFinancialRows) {
+      if (skipLegacyRows && startsNextSection) {
+        skipLegacyRows = false;
+      } else if (skipLegacyRows) {
         return false;
       }
 
@@ -1123,12 +877,7 @@ function internalReportText(report) {
         return false;
       }
 
-      return (
-        !/[€]/.test(line) &&
-        !/(Montant estimatif|Sous-total|Total TTC|Prix et fournitures|Dimensions exactes|Contraintes techniques|Matériaux souhaités|Accès chantier|Délais souhaités|Informations manquantes)/i.test(
-          line,
-        )
-      );
+      return !/[€]/.test(line) && !legacyLineTerms.some((term) => lowerLine.includes(term));
     })
     .join("\n")
     .trim();
@@ -1175,9 +924,7 @@ Ville : ${city}
 Type d'intervention / chantier : ${projectType}
 Note vocale : ${voiceStatus}
 
-Dossier à traiter par l'équipe interne pour vérification et préparation du devis.`;
-
-  elements.whatsappMessage.value = "";
+Dossier à traiter par l'équipe interne pour vérification et traitement.`;
 }
 
 function renderReport() {
@@ -1213,15 +960,9 @@ function renderReportNotice(message) {
 }
 
 function renderAll() {
-  const preset = currentPreset();
-  const rows = currentQuoteRows();
   renderPhotoGallery();
   renderVoiceNote();
-  renderDetected(preset);
-  renderQuoteRows(rows);
-  renderTotals(rows);
-  renderMaterials(preset);
-  renderMessages(rows);
+  renderMessages();
   renderReport();
 }
 
@@ -1233,7 +974,6 @@ function showToast(message) {
 }
 
 function analyzeVisit() {
-  const rows = currentQuoteRows();
   const textNote = elements.voiceNote.value.trim();
 
   persistDetailFields();
@@ -1255,15 +995,12 @@ function analyzeVisit() {
     visitStatus: elements.detailStatus.value,
     textNote,
     photos: photosForStorage(),
-    quoteRows: rows,
-    followupJ3: elements.followupJ3.checked,
   });
 
   updateVisit({
     projectType: normalizeProjectType(elements.projectTypeInput.value),
     textNote,
     report,
-    quoteRows: rows,
     analyzedAt: state.analyzedAt.toISOString(),
   });
   renderAll();
@@ -1293,23 +1030,6 @@ function prepareEmailAndPdf() {
   renderDetailMeta();
   copyText(elements.clientMessage.value, elements.clientMessage);
   showToast("Envoi du dossier préparé à copier");
-}
-
-function updateQuoteRowFromInput(input) {
-  const rowElement = input.closest("[data-quote-index]");
-  if (!rowElement) return;
-
-  const index = Number(rowElement.dataset.quoteIndex);
-  const field = input.dataset.quoteField;
-  const rows = currentQuoteRows();
-  const row = rows[index];
-  if (!row) return;
-
-  row[field] = field === "total" ? parseAmount(input.value) : input.value;
-  updateVisit({ quoteRows: rows });
-  renderTotals(rows);
-  renderMessages(rows);
-  renderDetailMeta();
 }
 
 async function photoFromFile(file) {
@@ -1412,61 +1132,12 @@ elements.folderList.addEventListener("click", (event) => {
   openVisit(card.dataset.folderId);
 });
 
-document.querySelectorAll(".tab").forEach((button) => {
-  button.addEventListener("click", () => {
-    const target = button.dataset.tab;
-    document.querySelectorAll(".tab").forEach((item) => item.classList.remove("active"));
-    document.querySelectorAll(".tab-panel").forEach((panel) => panel.classList.remove("active"));
-    button.classList.add("active");
-    document.querySelector(`#tab-${target}`).classList.add("active");
-  });
-});
-
 document.querySelector("#generateButton").addEventListener("click", analyzeVisit);
 document.querySelector("#generateButtonTop").addEventListener("click", analyzeVisit);
-
-elements.addQuoteRow.addEventListener("click", () => {
-  const rows = currentQuoteRows();
-  rows.push({
-    label: "Nouveau poste",
-    detail: "À préciser",
-    qty: "1",
-    total: 0,
-  });
-  updateVisit({ quoteRows: rows });
-  renderQuoteRows(rows);
-  renderTotals(rows);
-  renderMessages(rows);
-  showToast("Poste ajouté");
-});
-
-elements.quoteRows.addEventListener("input", (event) => {
-  if (!event.target.matches("[data-quote-field]")) return;
-  updateQuoteRowFromInput(event.target);
-});
-
-elements.vatRate.addEventListener("change", () => {
-  renderTotals();
-  renderMessages();
-  persistDetailFields();
-});
 
 elements.detailStatus.addEventListener("change", () => {
   persistDetailFields();
   showToast("Statut mis à jour");
-});
-
-elements.autoFollowup.addEventListener("change", () => {
-  renderMessages();
-  persistDetailFields();
-  showToast(elements.autoFollowup.checked ? "Rappels internes activés" : "Rappels internes désactivés");
-});
-
-[elements.followupJ3, elements.followupJ7].forEach((checkbox) => {
-  checkbox.addEventListener("change", () => {
-    persistDetailFields();
-    showToast("Rappels internes mis à jour");
-  });
 });
 
 ["input", "change"].forEach((eventName) => {
@@ -1485,16 +1156,10 @@ elements.autoFollowup.addEventListener("change", () => {
   });
 
   elements.voiceNote.addEventListener(eventName, () => {
-    renderDetected();
     renderMessages();
     renderReport();
     persistDetailFields();
   });
-});
-
-elements.copyWhatsappButton.addEventListener("click", async () => {
-  const copied = await copyText(elements.whatsappMessage.value, elements.whatsappMessage);
-  showToast(copied ? "Message interne copié" : "Message interne sélectionné");
 });
 
 elements.prepareEmailButton.addEventListener("click", prepareEmailAndPdf);
@@ -1503,10 +1168,6 @@ document.querySelector("#printButton").addEventListener("click", () => window.pr
 elements.voiceRecordButton.addEventListener("click", startVoiceRecording);
 elements.voiceStopButton.addEventListener("click", stopVoiceRecording);
 elements.voiceDeleteButton.addEventListener("click", deleteVoiceNote);
-
-document.querySelector("#pdfInputButton").addEventListener("click", () => {
-  showToast("Ajout de plan à prévoir plus tard");
-});
 
 document.querySelector("#nextAction").addEventListener("click", () => {
   showToast("Dossier à traiter par l'équipe interne");
