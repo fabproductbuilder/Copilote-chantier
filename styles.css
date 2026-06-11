@@ -96,6 +96,16 @@ svg {
   display: flex;
   align-items: center;
   min-width: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.brand:focus-visible {
+  outline: 3px solid rgba(15, 108, 255, 0.28);
+  outline-offset: 4px;
 }
 
 .brand-logo {
@@ -732,6 +742,18 @@ h2 {
   color: #16467f;
   font-size: 12px;
   font-weight: 800;
+}
+
+.detected-list p {
+  width: 100%;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  background: #f8fbfc;
+  color: var(--slate);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .quote-tools {

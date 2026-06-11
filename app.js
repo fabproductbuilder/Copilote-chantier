@@ -34,13 +34,12 @@ const visitTypeLabels = {
 };
 
 const statusLabels = {
-  draft: "Brouillon",
-  sent: "Devis envoyé",
-  accepted: "Accepté",
-  declined: "Refusé",
+  draft: "À compléter",
+  sent: "Transmis",
+  transmitted: "Transmis",
 };
 
-const DEFAULT_PROJECT_TYPE = "renovation";
+const DEFAULT_PROJECT_TYPE = "";
 const DEFAULT_VISIT_STATUS = "draft";
 
 const visitPresets = {
@@ -197,6 +196,7 @@ const visitPresets = {
 const elements = {
   homeView: document.querySelector("#homeView"),
   detailView: document.querySelector("#detailView"),
+  brandHomeButton: document.querySelector("#brandHomeButton"),
   homeButton: document.querySelector("#homeButton"),
   topNewFolderButton: document.querySelector("#topNewFolderButton"),
   newFolderButton: document.querySelector("#newFolderButton"),
@@ -220,6 +220,8 @@ const elements = {
   clientCity: document.querySelector("#clientCity"),
   clientPhone: document.querySelector("#clientPhone"),
   clientEmail: document.querySelector("#clientEmail"),
+  officeEmail: document.querySelector("#officeEmail"),
+  projectTypeInput: document.querySelector("#projectTypeInput"),
   detailStatus: document.querySelector("#detailStatus"),
   detailStatusPill: document.querySelector("#detailStatusPill"),
   voiceNote: document.querySelector("#voiceNote"),
@@ -244,6 +246,7 @@ const elements = {
   followupJ3: document.querySelector("#followupJ3"),
   followupJ7: document.querySelector("#followupJ7"),
   lastUpdateValue: document.querySelector("#lastUpdateValue"),
+  internalStatusValue: document.querySelector("#internalStatusValue"),
   nextAction: document.querySelector("#nextAction"),
 };
 
@@ -268,7 +271,13 @@ function cloneRows(rows) {
 }
 
 function normalizeProjectType(value) {
-  return visitPresets[value] ? value : DEFAULT_PROJECT_TYPE;
+  const projectType = firstString(value);
+  if (!projectType) return DEFAULT_PROJECT_TYPE;
+  return visitTypeLabels[projectType] || projectType;
+}
+
+function projectTypeLabel(value) {
+  return firstString(value) || "Type d'intervention à préciser";
 }
 
 function normalizeVisitStatus(value) {
@@ -379,16 +388,9 @@ function reportPhotoLabel(count) {
   return `${photoLabel(count)} jointe${count > 1 ? "s" : ""} à la visite.`;
 }
 
-function quoteRowsForReport(rows = []) {
-  const validRows = rows.filter((row) => row?.label);
-  if (validRows.length === 0) {
-    return "Aucun poste financier détaillé pour le moment.";
-  }
-
-  return validRows
-    .slice(0, 5)
-    .map((row) => `- ${row.label} : ${row.qty || "1"} / ${euro.format(Number(row.total) || 0)}`)
-    .join("\n");
+function internalTreatmentInfoText(textNote) {
+  const note = String(textNote || "").trim();
+  return note || "À compléter à partir de la note de visite.";
 }
 
 function buildReportText(visit = {}) {
@@ -398,16 +400,13 @@ function buildReportText(visit = {}) {
   const address = firstString(visit.address);
   const phone = firstString(visit.phone) || "Téléphone à compléter";
   const email = firstString(visit.email) || "Email à compléter";
-  const projectType = visitTypeLabels[visit.projectType] || "Type de chantier à préciser";
+  const projectType = projectTypeLabel(visit.projectType);
   const photos = Array.isArray(visit.photos) ? visit.photos : [];
-  const quoteRows = normalizeQuoteRows(visit.quoteRows);
-  const nextAction = visit.followupJ3
-    ? "Préparer une relance client à J+3 si le client n'a pas répondu."
-    : "Reprendre contact avec le client après envoi du pré-devis.";
+  const nextAction = "Préparer la transmission du dossier pour traitement interne et préparation du devis.";
 
   return `Résumé de la visite
 Client : ${clientName}
-Chantier : ${projectType}
+Type d'intervention / chantier : ${projectType}
 Localisation : ${address ? `${address}, ${city}` : city}
 Contact : ${phone} / ${email}
 
@@ -415,18 +414,14 @@ Demande du client
 ${note}
 
 Éléments collectés
-Type de chantier : ${projectType}
-Postes financiers disponibles :
-${quoteRowsForReport(quoteRows)}
+Type d'intervention / chantier : ${projectType}
+Photos prises en compte : ${photos.length}
 
 Photos jointes
 ${reportPhotoLabel(photos.length)}
 
-Points à vérifier
-- Quantités exactes avant envoi
-- Prix et fournitures à valider
-- Contraintes d'accès, protections et planning
-- Cohérence entre photos, note de visite et postes financiers
+Informations pour traitement interne
+${internalTreatmentInfoText(note)}
 
 Prochaine action
 ${nextAction}`;
@@ -445,6 +440,7 @@ function createVisit(overrides = {}) {
     clientName: firstString(overrides.clientName) || "Nouveau client",
     phone: firstString(overrides.phone, overrides.clientPhone),
     email: firstString(overrides.email, overrides.clientEmail),
+    officeEmail: firstString(overrides.officeEmail),
     city: firstString(overrides.city),
     address: firstString(overrides.address),
     projectType,
@@ -477,6 +473,7 @@ function normalizeVisit(raw = {}) {
     clientName: raw.clientName,
     phone: raw.phone || raw.clientPhone,
     email: raw.email || raw.clientEmail,
+    officeEmail: raw.officeEmail,
     city: raw.city,
     address: raw.address,
     projectType,
@@ -573,6 +570,30 @@ function statusClass(status) {
   return `status-${status || "draft"}`;
 }
 
+function dossierStatus(visite = {}) {
+  if (visite.transmittedAt || visite.visitStatus === "transmitted") {
+    return {
+      key: "transmitted",
+      label: "Transmis",
+      className: "status-sent",
+    };
+  }
+
+  if (visite.report) {
+    return {
+      key: "ready",
+      label: "Prêt à transmettre",
+      className: "status-ready",
+    };
+  }
+
+  return {
+    key: "incomplete",
+    label: "À compléter",
+    className: "status-draft",
+  };
+}
+
 function parseAmount(value) {
   const normalized = String(value || "")
     .replace(/\s/g, "")
@@ -592,39 +613,40 @@ function escapeAttr(value) {
 function renderHome() {
   const totals = {
     total: state.visites.length,
-    draft: state.visites.filter((visite) => visite.visitStatus === "draft").length,
-    sent: state.visites.filter((visite) => visite.visitStatus === "sent").length,
-    accepted: state.visites.filter((visite) => visite.visitStatus === "accepted").length,
+    incomplete: state.visites.filter((visite) => dossierStatus(visite).key === "incomplete").length,
+    ready: state.visites.filter((visite) => dossierStatus(visite).key === "ready").length,
+    transmitted: state.visites.filter((visite) => dossierStatus(visite).key === "transmitted").length,
   };
 
   elements.totalFoldersCount.textContent = totals.total;
-  elements.draftFoldersCount.textContent = totals.draft;
-  elements.sentFoldersCount.textContent = totals.sent;
-  elements.acceptedFoldersCount.textContent = totals.accepted;
+  elements.draftFoldersCount.textContent = totals.incomplete;
+  elements.sentFoldersCount.textContent = totals.ready;
+  elements.acceptedFoldersCount.textContent = totals.transmitted;
 
   const filter = elements.statusFilter.value;
   const visites = state.visites
-    .filter((visite) => filter === "all" || visite.visitStatus === filter)
+    .filter((visite) => filter === "all" || dossierStatus(visite).key === filter)
     .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
 
   elements.emptyState.hidden = visites.length > 0;
   elements.folderList.innerHTML = visites
     .map((visite) => {
-      const total = sumRows(visite.quoteRows || []) * (1 + Number(visite.vatRate || "0.1"));
       const contact = [visite.city || "Ville à compléter", visite.phone, visite.email]
         .filter(Boolean)
         .join(" · ");
+      const progressLabel = visite.report ? "Compte-rendu prêt" : photoLabel((visite.photos || []).length);
+      const status = dossierStatus(visite);
 
       return `
         <button class="folder-card" data-folder-id="${visite.id}" type="button">
           <span class="folder-main">
-            <span class="folder-kicker">${visitTypeLabels[visite.projectType] || "Rénovation"}</span>
+            <span class="folder-kicker">${projectTypeLabel(visite.projectType)}</span>
             <strong>${visitTitle(visite)}</strong>
             <small>${contact || "Contact à compléter"} · ${formatDate(visite.updatedAt)}</small>
           </span>
           <span class="folder-meta">
-            <span class="status-pill ${statusClass(visite.visitStatus)}">${statusLabels[visite.visitStatus]}</span>
-            <strong>${euro.format(total)}</strong>
+            <span class="status-pill ${status.className}">${status.label}</span>
+            <strong>${progressLabel}</strong>
           </span>
         </button>
       `;
@@ -651,7 +673,7 @@ function showCreationForm() {
   elements.newClientPhone.value = "";
   elements.newClientEmail.value = "";
   elements.newClientCity.value = "";
-  elements.newClientTrade.value = "renovation";
+  elements.newClientTrade.value = "";
   elements.newClientStatus.value = "draft";
   elements.newClientName.focus();
 }
@@ -691,6 +713,8 @@ function hydrateDetail(visite) {
   elements.clientCity.value = visite.city || "";
   elements.clientPhone.value = visite.phone || "";
   elements.clientEmail.value = visite.email || "";
+  elements.officeEmail.value = visite.officeEmail || "";
+  elements.projectTypeInput.value = projectTypeLabel(visite.projectType) === "Type d'intervention à préciser" ? "" : projectTypeLabel(visite.projectType);
   elements.detailStatus.value = visite.visitStatus || DEFAULT_VISIT_STATUS;
   elements.voiceNote.value = visite.textNote || "";
   elements.vatRate.value = visite.vatRate || "0.1";
@@ -698,10 +722,6 @@ function hydrateDetail(visite) {
   elements.followupJ3.checked = visite.followupJ3 ?? true;
   elements.followupJ7.checked = visite.followupJ7 ?? true;
   renderPhotoGallery(visite.photos);
-
-  document.querySelectorAll(".segment").forEach((item) => {
-    item.classList.toggle("active", item.dataset.trade === state.visitType);
-  });
 
   renderAll();
   renderDetailMeta();
@@ -715,22 +735,27 @@ function renderDetailMeta() {
   elements.detailStatusPill.textContent = statusLabels[visite.visitStatus] || statusLabels.draft;
   elements.detailStatusPill.className = `status-pill ${statusClass(visite.visitStatus)}`;
   elements.lastUpdateValue.textContent = formatDate(visite.updatedAt);
-  const nextActionLabel = visite.followupJ3
-    ? `Relance J+3 prévue le ${addDays(visite.updatedAt, 3)}`
-    : `Relance J+7 prévue le ${addDays(visite.updatedAt, 7)}`;
+  elements.internalStatusValue.textContent = visite.report ? "Prêt à transmettre" : "À compléter";
+  const nextActionLabel = visite.report
+    ? "À traiter par l'équipe interne"
+    : "Compte-rendu à générer avant transmission";
   elements.nextAction.innerHTML = `${nextActionLabel}<svg><use href="#icon-chevron"></use></svg>`;
 }
 
 function renderPhotoGallery(photos = currentVisit()?.photos || []) {
   const normalizedPhotos = normalizePhotos({ photos }, currentVisit()?.createdAt || nowIso());
-  elements.mainPhoto.src = normalizedPhotos[0]?.dataUrl || DEFAULT_PHOTO;
+  const mediaCard = elements.mainPhoto.closest(".media-card");
   elements.photoCount.textContent = photoLabel(normalizedPhotos.length);
 
   if (normalizedPhotos.length === 0) {
-    elements.photoGallery.innerHTML = '<div class="photo-empty">Aucune photo ajoutée</div>';
+    if (mediaCard) mediaCard.hidden = true;
+    elements.mainPhoto.removeAttribute("src");
+    elements.photoGallery.innerHTML = '<div class="photo-empty">Aucune photo ajoutée pour cette visite.</div>';
     return;
   }
 
+  if (mediaCard) mediaCard.hidden = false;
+  elements.mainPhoto.src = normalizedPhotos[0].dataUrl;
   elements.photoGallery.innerHTML = normalizedPhotos
     .map((photo, index) => `
       <figure class="photo-thumb" data-photo-id="${escapeAttr(photo.id)}">
@@ -748,12 +773,15 @@ function photosForStorage() {
 
 function persistDetailFields() {
   const textNote = elements.voiceNote.value;
+  const projectType = normalizeProjectType(elements.projectTypeInput.value);
+  state.visitType = projectType;
   updateVisit({
     clientName: elements.clientName.value.trim() || "Nouveau client",
     phone: elements.clientPhone.value.trim(),
     email: elements.clientEmail.value.trim(),
+    officeEmail: elements.officeEmail.value.trim(),
     city: elements.clientCity.value.trim(),
-    projectType: state.visitType,
+    projectType,
     visitStatus: elements.detailStatus.value,
     textNote,
     vatRate: elements.vatRate.value,
@@ -766,10 +794,8 @@ function persistDetailFields() {
   renderDetailMeta();
 }
 
-function renderDetected(preset) {
-  elements.detectedList.innerHTML = preset.detected
-    .map((item) => `<span>${item}</span>`)
-    .join("");
+function renderDetected() {
+  elements.detectedList.innerHTML = `<p>${escapeAttr(internalTreatmentInfoText(elements.voiceNote.value))}</p>`;
 }
 
 function renderQuoteRows(rows) {
@@ -807,37 +833,96 @@ function getClientFirstName() {
   return raw.replace(/^M\.?\s+|^Mme\.?\s+/i, "");
 }
 
-function renderMessages(rows = currentQuoteRows()) {
-  const subtotal = sumRows(rows);
-  const total = euro.format(subtotal * (1 + Number(elements.vatRate.value)));
-  const city = elements.clientCity.value || "votre adresse";
+function internalReportText(report) {
+  const rawReport = String(report || "").trim();
+  if (!rawReport) {
+    return "Compte-rendu de visite : à générer avant transmission.";
+  }
+
+  let skipLegacyFinancialRows = false;
+  let skipLegacyChecklistRows = false;
+  const cleanedReport = rawReport
+    .split("\n")
+    .filter((line) => {
+      const trimmed = line.trim();
+      const startsNextSection = /^(Photos jointes|Informations pour traitement interne|Prochaine action)$/i.test(
+        trimmed,
+      );
+
+      if (/^Postes financiers disponibles\s*:?$/i.test(trimmed)) {
+        skipLegacyFinancialRows = true;
+        return false;
+      }
+
+      if (/^Points à vérifier( pour le devis)?\s*:?$/i.test(trimmed)) {
+        skipLegacyChecklistRows = true;
+        return false;
+      }
+
+      if (skipLegacyFinancialRows && startsNextSection) {
+        skipLegacyFinancialRows = false;
+      } else if (skipLegacyFinancialRows) {
+        return false;
+      }
+
+      if (skipLegacyChecklistRows && /^Prochaine action$/i.test(trimmed)) {
+        skipLegacyChecklistRows = false;
+      } else if (skipLegacyChecklistRows) {
+        return false;
+      }
+
+      return (
+        !/[€]/.test(line) &&
+        !/(Montant estimatif|Sous-total|Total TTC|Prix et fournitures|Dimensions exactes|Contraintes techniques|Matériaux souhaités|Accès chantier|Délais souhaités|Informations manquantes)/i.test(
+          line,
+        )
+      );
+    })
+    .join("\n")
+    .trim();
+
+  return `Compte-rendu de visite :\n${cleanedReport || "À générer avant transmission."}`;
+}
+
+function renderMessages() {
+  const clientName = elements.clientName.value.trim() || "Client à compléter";
+  const city = elements.clientCity.value || "Ville à compléter";
   const email = elements.clientEmail.value.trim();
   const phone = elements.clientPhone.value.trim();
-  const confirmedRows = rows
-    .slice(0, 4)
-    .map((row) => `- ${row.label} : ${row.qty}, ${euro.format(row.total)}`)
-    .join("\n");
+  const visit = currentVisit();
+  const projectType = projectTypeLabel(elements.projectTypeInput.value || visit?.projectType);
+  const reportStatus = visit?.report ? "- le compte-rendu généré ;" : "- le compte-rendu à générer ;";
+  const reportSection = internalReportText(visit?.report);
+  const internalInfo = internalTreatmentInfoText(elements.voiceNote.value || visit?.textNote);
 
-  elements.clientMessage.value = `Objet : Pré-devis suite à la visite chantier
+  elements.clientMessage.value = `Objet : Compte-rendu visite chantier - ${clientName}
 
-Bonjour ${getClientFirstName()},
+Bonjour,
 
-Suite à la visite réalisée à ${city}, je vous transmets le pré-devis PDF en pièce jointe.
+Voici le compte-rendu de la visite chantier réalisée chez ${clientName}.
 
-Résumé des postes :
-${confirmedRows}
+Le dossier contient :
+- les informations client ;
+- le type d'intervention / chantier ;
+- les notes de visite ;
+- les photos prises sur place ;
+${reportStatus}
+- les informations utiles au traitement interne.
 
-Montant estimatif TTC : ${total}
+${reportSection}
 
-Ce pré-devis reste vérifiable avant validation finale des matériaux, des quantités et du planning.
+Informations pour traitement interne :
+${internalInfo}
 
 Coordonnées client :
 ${email ? `Email : ${email}` : "Email : à compléter"}
 ${phone ? `Téléphone : ${phone}` : "Téléphone : à compléter"}
+Ville : ${city}
+Type d'intervention / chantier : ${projectType}
 
-Bonne journée.`;
+Dossier à traiter par l'équipe interne pour vérification et préparation du devis.`;
 
-  elements.whatsappMessage.value = `Bonjour ${getClientFirstName()}, je viens de préparer le pré-devis suite à la visite chantier. Je vous l'envoie officiellement par email avec le PDF. Je reste disponible si vous avez une question.`;
+  elements.whatsappMessage.value = "";
 }
 
 function renderReport() {
@@ -910,7 +995,7 @@ function analyzeVisit() {
     phone: elements.clientPhone.value.trim(),
     email: elements.clientEmail.value.trim(),
     city: elements.clientCity.value.trim(),
-    projectType: state.visitType,
+    projectType: normalizeProjectType(elements.projectTypeInput.value),
     visitStatus: elements.detailStatus.value,
     textNote,
     photos: photosForStorage(),
@@ -919,7 +1004,7 @@ function analyzeVisit() {
   });
 
   updateVisit({
-    projectType: state.visitType,
+    projectType: normalizeProjectType(elements.projectTypeInput.value),
     textNote,
     report,
     quoteRows: rows,
@@ -927,7 +1012,7 @@ function analyzeVisit() {
   });
   renderAll();
   renderDetailMeta();
-  showToast("Compte-rendu généré, éléments financiers à vérifier");
+  showToast("Compte-rendu généré, dossier prêt à vérifier");
 }
 
 async function copyText(text, fallbackElement) {
@@ -948,12 +1033,10 @@ async function copyText(text, fallbackElement) {
 
 function prepareEmailAndPdf() {
   persistDetailFields();
-  updateVisit({ visitStatus: "sent" }, true);
-  elements.detailStatus.value = "sent";
+  renderMessages();
   renderDetailMeta();
   copyText(elements.clientMessage.value, elements.clientMessage);
-  showToast("Email prêt, PDF ouvert pour export");
-  window.print();
+  showToast("Envoi du dossier préparé à copier");
 }
 
 function updateQuoteRowFromInput(input) {
@@ -1043,6 +1126,7 @@ function removePhoto(photoId) {
 }
 
 elements.homeButton.addEventListener("click", () => setView("home"));
+elements.brandHomeButton.addEventListener("click", () => setView("home"));
 elements.topNewFolderButton.addEventListener("click", showCreationForm);
 elements.newFolderButton.addEventListener("click", showCreationForm);
 elements.cancelNewFolder.addEventListener("click", hideCreationForm);
@@ -1055,7 +1139,7 @@ elements.newFolderForm.addEventListener("submit", (event) => {
     phone: elements.newClientPhone.value.trim(),
     email: elements.newClientEmail.value.trim(),
     city: elements.newClientCity.value.trim(),
-    projectType: elements.newClientTrade.value,
+    projectType: elements.newClientTrade.value.trim(),
     visitStatus: elements.newClientStatus.value,
   });
 
@@ -1070,15 +1154,6 @@ elements.folderList.addEventListener("click", (event) => {
   const card = event.target.closest("[data-folder-id]");
   if (!card) return;
   openVisit(card.dataset.folderId);
-});
-
-document.querySelectorAll(".segment").forEach((button) => {
-  button.addEventListener("click", () => {
-    document.querySelectorAll(".segment").forEach((item) => item.classList.remove("active"));
-    button.classList.add("active");
-    state.visitType = button.dataset.trade;
-    analyzeVisit();
-  });
 });
 
 document.querySelectorAll(".tab").forEach((button) => {
@@ -1128,18 +1203,25 @@ elements.detailStatus.addEventListener("change", () => {
 elements.autoFollowup.addEventListener("change", () => {
   renderMessages();
   persistDetailFields();
-  showToast(elements.autoFollowup.checked ? "Relances activées" : "Relances désactivées");
+  showToast(elements.autoFollowup.checked ? "Rappels internes activés" : "Rappels internes désactivés");
 });
 
 [elements.followupJ3, elements.followupJ7].forEach((checkbox) => {
   checkbox.addEventListener("change", () => {
     persistDetailFields();
-    showToast("Relances mises à jour");
+    showToast("Rappels internes mis à jour");
   });
 });
 
 ["input", "change"].forEach((eventName) => {
-  [elements.clientName, elements.clientCity, elements.clientPhone, elements.clientEmail].forEach((field) => {
+  [
+    elements.clientName,
+    elements.clientCity,
+    elements.clientPhone,
+    elements.clientEmail,
+    elements.officeEmail,
+    elements.projectTypeInput,
+  ].forEach((field) => {
     field.addEventListener(eventName, () => {
       renderMessages();
       persistDetailFields();
@@ -1147,6 +1229,8 @@ elements.autoFollowup.addEventListener("change", () => {
   });
 
   elements.voiceNote.addEventListener(eventName, () => {
+    renderDetected();
+    renderMessages();
     renderReport();
     persistDetailFields();
   });
@@ -1154,7 +1238,7 @@ elements.autoFollowup.addEventListener("change", () => {
 
 elements.copyWhatsappButton.addEventListener("click", async () => {
   const copied = await copyText(elements.whatsappMessage.value, elements.whatsappMessage);
-  showToast(copied ? "Message WhatsApp copié" : "Message WhatsApp sélectionné");
+  showToast(copied ? "Message interne copié" : "Message interne sélectionné");
 });
 
 elements.prepareEmailButton.addEventListener("click", prepareEmailAndPdf);
@@ -1173,7 +1257,7 @@ document.querySelector("#pdfInputButton").addEventListener("click", () => {
 });
 
 document.querySelector("#nextAction").addEventListener("click", () => {
-  showToast("Relance prête à copier");
+  showToast("Dossier à traiter par l'équipe interne");
 });
 
 elements.photoGallery.addEventListener("click", (event) => {
