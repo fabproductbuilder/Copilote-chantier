@@ -84,6 +84,7 @@ const elements = {
   voiceDeleteButton: document.querySelector("#voiceDeleteButton"),
   voiceAudioPlayer: document.querySelector("#voiceAudioPlayer"),
   voiceRecordStatus: document.querySelector("#voiceRecordStatus"),
+  printDossier: document.querySelector("#printDossier"),
 };
 
 const state = {
@@ -485,6 +486,16 @@ function formatDate(dateLike) {
   }).format(date);
 }
 
+function formatPrintDate(dateLike = new Date()) {
+  const date = new Date(dateLike);
+  const validDate = Number.isNaN(date.getTime()) ? new Date() : date;
+
+  return new Intl.DateTimeFormat("fr-FR", {
+    dateStyle: "long",
+    timeStyle: "short",
+  }).format(validDate);
+}
+
 function visitTitle(visite) {
   return `Visite chez ${visite.clientName || "Nouveau client"}`;
 }
@@ -670,6 +681,7 @@ function renderDetailMeta() {
     ? "À traiter par l'équipe interne"
     : "Compte-rendu à générer avant transmission";
   elements.nextAction.innerHTML = `${nextActionLabel}<svg><use href="#icon-chevron"></use></svg>`;
+  renderPrintDossier();
 }
 
 function renderPhotoGallery(photos = currentVisit()?.photos || []) {
@@ -841,6 +853,7 @@ async function startVoiceRecording() {
           state.audioStatusKind = "saved";
           renderVoiceNote();
           renderMessages();
+          renderPrintDossier();
           showToast("Note vocale enregistrée.");
         } else {
           state.audioStatusMessage = "";
@@ -893,6 +906,7 @@ function deleteVoiceNote() {
   state.audioStatusKind = "";
   renderVoiceNote();
   renderMessages();
+  renderPrintDossier();
   showToast("Note vocale supprimée");
 }
 
@@ -993,11 +1007,132 @@ function renderReportNotice(message) {
   `;
 }
 
+function printableReportHtml(visite) {
+  const report = sanitizeLegacyReportText(visite?.report);
+
+  if (!report) {
+    return `
+      <div class="print-block">
+        <h2>Compte-rendu de visite</h2>
+        <p>Compte-rendu de visite : à générer avant impression finale.</p>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="print-block">
+      <h2>Compte-rendu de visite</h2>
+      ${report
+        .split(/\n{2,}/)
+        .map((block) => {
+          const [title, ...lines] = block.split("\n");
+          const content = lines.map((line) => escapeAttr(line)).join("<br />");
+          return `
+            <section class="print-report-section">
+              <h3>${escapeAttr(title)}</h3>
+              ${content ? `<p>${content}</p>` : ""}
+            </section>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+function printablePhotosHtml(visite) {
+  const photos = normalizePhotos({ photos: visite?.photos || [] }, visite?.createdAt || nowIso());
+
+  if (photos.length === 0) {
+    return `
+      <div class="print-block">
+        <h2>Photos de visite</h2>
+        <p>Aucune photo ajoutée pour cette visite.</p>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="print-block">
+      <h2>Photos de visite</h2>
+      <div class="print-photo-grid">
+        ${photos
+          .map(
+            (photo, index) => `
+              <figure>
+                <img src="${escapeAttr(photo.dataUrl)}" alt="Photo de visite ${index + 1}" />
+                <figcaption>Photo ${index + 1}</figcaption>
+              </figure>
+            `,
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderPrintDossier() {
+  const visite = currentVisit();
+  if (!visite || !elements.printDossier) {
+    if (elements.printDossier) elements.printDossier.innerHTML = "";
+    return;
+  }
+
+  const status = dossierStatus(visite);
+  const clientName = firstString(visite.clientName) || "Client à compléter";
+  const phone = firstString(visite.phone) || "Téléphone à compléter";
+  const email = firstString(visite.email) || "Email à compléter";
+  const city = firstString(visite.city) || "Ville à compléter";
+  const address = firstString(visite.address);
+  const location = address ? `${address}, ${city}` : city;
+  const projectType = projectTypeLabel(visite.projectType);
+  const nextActionLabel = visite.report
+    ? "À traiter par l'équipe interne"
+    : "Compte-rendu à générer avant transmission";
+
+  elements.printDossier.innerHTML = `
+    <header class="print-header">
+      <div>
+        <p class="print-brand">Copilote Chantier</p>
+        <h1>Dossier de visite chantier</h1>
+        <p>Document interne pour traitement du dossier.</p>
+      </div>
+      <div class="print-date">
+        <span>Date de génération</span>
+        <strong>${escapeAttr(formatPrintDate())}</strong>
+      </div>
+    </header>
+
+    <section class="print-block">
+      <h2>Informations client</h2>
+      <dl class="print-info-grid">
+        <div><dt>Client</dt><dd>${escapeAttr(clientName)}</dd></div>
+        <div><dt>Téléphone</dt><dd>${escapeAttr(phone)}</dd></div>
+        <div><dt>Email</dt><dd>${escapeAttr(email)}</dd></div>
+        <div><dt>Ville / adresse</dt><dd>${escapeAttr(location)}</dd></div>
+        <div><dt>Type d'intervention / chantier</dt><dd>${escapeAttr(projectType)}</dd></div>
+        <div><dt>Note vocale</dt><dd>${escapeAttr(`Note vocale : ${voiceNoteLabel(visite.voiceNote)}`)}</dd></div>
+      </dl>
+    </section>
+
+    ${printableReportHtml(visite)}
+    ${printablePhotosHtml(visite)}
+
+    <section class="print-block">
+      <h2>Suivi interne</h2>
+      <dl class="print-info-grid">
+        <div><dt>Statut du dossier</dt><dd>${escapeAttr(status.label)}</dd></div>
+        <div><dt>Prochaine action interne</dt><dd>${escapeAttr(nextActionLabel)}</dd></div>
+      </dl>
+    </section>
+  `;
+}
+
 function renderAll() {
   renderPhotoGallery();
   renderVoiceNote();
   renderMessages();
   renderReport();
+  renderPrintDossier();
 }
 
 function showToast(message) {
@@ -1058,12 +1193,19 @@ async function copyText(text, fallbackElement) {
   }
 }
 
-function prepareEmailAndPdf() {
+function prepareInternalTransmission() {
   persistDetailFields();
   renderMessages();
   renderDetailMeta();
   copyText(elements.clientMessage.value, elements.clientMessage);
   showToast("Envoi du dossier préparé à copier");
+}
+
+function printVisitDossier() {
+  persistDetailFields();
+  renderAll();
+  renderDetailMeta();
+  window.print();
 }
 
 async function photoFromFile(file) {
@@ -1116,6 +1258,7 @@ async function addPhotoFiles(fileList) {
   updateVisit({ photos: photosToSave });
   const savedPhotos = currentVisit()?.photos || [];
   renderPhotoGallery(savedPhotos);
+  renderPrintDossier();
 
   if (files.length > selectedFiles.length || addedPhotos.length > remainingSlots) {
     showToast(`Photos ajoutées, limite ${MAX_PHOTOS_PER_VISIT} atteinte`);
@@ -1132,6 +1275,7 @@ function removePhoto(photoId) {
   const photos = (visite.photos || []).filter((photo) => photo.id !== photoId);
   updateVisit({ photos });
   renderPhotoGallery(currentVisit()?.photos || []);
+  renderPrintDossier();
   showToast("Photo supprimée");
 }
 
@@ -1195,8 +1339,8 @@ elements.detailStatus.addEventListener("change", () => {
   });
 });
 
-elements.prepareEmailButton.addEventListener("click", prepareEmailAndPdf);
-document.querySelector("#printButton").addEventListener("click", () => window.print());
+elements.prepareEmailButton.addEventListener("click", prepareInternalTransmission);
+document.querySelector("#printButton").addEventListener("click", printVisitDossier);
 
 elements.voiceRecordButton.addEventListener("click", startVoiceRecording);
 elements.voiceStopButton.addEventListener("click", stopVoiceRecording);
