@@ -84,6 +84,9 @@ const elements = {
   voiceDeleteButton: document.querySelector("#voiceDeleteButton"),
   voiceAudioPlayer: document.querySelector("#voiceAudioPlayer"),
   voiceRecordStatus: document.querySelector("#voiceRecordStatus"),
+  dictateNoteButton: document.querySelector("#dictateNoteButton"),
+  stopDictationButton: document.querySelector("#stopDictationButton"),
+  dictationStatus: document.querySelector("#dictationStatus"),
   printDossier: document.querySelector("#printDossier"),
 };
 
@@ -100,6 +103,11 @@ const state = {
   audioVisitId: null,
   audioStatusMessage: "",
   audioStatusKind: "",
+  speechRecognition: null,
+  dictationActive: false,
+  dictationStopRequested: false,
+  dictationStatusMessage: "Dictée prête",
+  dictationStatusKind: "ready",
 };
 
 function createId() {
@@ -246,8 +254,8 @@ function reportPhotoLabel(count) {
   return `${photoLabel(count)} jointe${count > 1 ? "s" : ""} à la visite.`;
 }
 
-function voiceNoteLabel(voiceNote) {
-  return normalizeVoiceNote(voiceNote) ? "présente" : "non ajoutée";
+function audioOriginalLabel(voiceNote) {
+  return normalizeVoiceNote(voiceNote) ? "conservé" : "non conservé";
 }
 
 function internalTreatmentInfoText(textNote) {
@@ -258,7 +266,7 @@ function internalTreatmentInfoText(textNote) {
 }
 
 function writtenNoteLabel(textNote) {
-  return String(textNote || "").trim() ? "présente" : "non renseignée";
+  return String(textNote || "").trim() ? "renseignée" : "non renseignée";
 }
 
 function reportStatusLabel(report) {
@@ -310,6 +318,7 @@ function sanitizeLegacyReportText(report) {
     .replace(/^Demande du client$/gim, "Demande / observations")
     .replace(/^Chantier\s*:/gim, "Type d'intervention / chantier :")
     .replace(/^Photos prises en compte\s*:/gim, "Nombre de photos :")
+    .replace(new RegExp(`^${["Note", " vocale"].join("")}\\s*:`, "gim"), "Audio original :")
     .split("\n")
     .filter((line) => {
       const trimmed = line.trim();
@@ -378,7 +387,8 @@ function isCurrentReportFormat(report) {
     "Demande / observations",
     "Éléments collectés",
     "Nombre de photos :",
-    "Note vocale :",
+    "Note de visite :",
+    "Audio original :",
     "Photos jointes",
     "Informations pour traitement interne",
     "Prochaine action",
@@ -407,7 +417,8 @@ ${note}
 
 Éléments collectés
 Nombre de photos : ${photos.length}
-Note vocale : ${voiceNoteLabel(visit.voiceNote)}
+Note de visite : ${writtenNoteLabel(note)}
+Audio original : ${audioOriginalLabel(visit.voiceNote)}
 
 Photos jointes
 ${reportPhotoLabel(photos.length)}
@@ -696,6 +707,9 @@ function updateVisitById(id, patch) {
 }
 
 function hydrateDetail(visite) {
+  if (state.dictationActive) {
+    stopDictation();
+  }
   if (state.audioRecorder?.state === "recording") {
     stopVoiceRecording();
   }
@@ -761,6 +775,148 @@ function photosForStorage() {
   return currentVisit()?.photos || [];
 }
 
+function speechRecognitionConstructor() {
+  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+
+function isDictationSupported() {
+  return Boolean(speechRecognitionConstructor());
+}
+
+function setDictationStatus(message, kind = "") {
+  state.dictationStatusMessage = message;
+  state.dictationStatusKind = kind;
+  elements.dictationStatus.textContent = message;
+  elements.dictationStatus.dataset.state = kind;
+}
+
+function renderDictationControls() {
+  const isSupported = isDictationSupported();
+  const isActive = state.dictationActive;
+
+  elements.dictateNoteButton.disabled = isActive || !isSupported;
+  elements.stopDictationButton.disabled = !isActive;
+
+  if (!isSupported) {
+    setDictationStatus(
+      "Dictée non disponible sur ce navigateur. Vous pouvez écrire la note ou conserver un audio original.",
+      "unsupported",
+    );
+    return;
+  }
+
+  if (isActive) {
+    setDictationStatus("Dictée en cours…", "recording");
+    return;
+  }
+
+  setDictationStatus(state.dictationStatusMessage || "Dictée prête", state.dictationStatusKind || "ready");
+}
+
+function appendDictatedText(transcript) {
+  const text = String(transcript || "").trim().replace(/\s+/g, " ");
+  if (!text) return;
+
+  const currentText = elements.voiceNote.value.trimEnd();
+  const separator = currentText ? "\n" : "";
+  elements.voiceNote.value = `${currentText}${separator}${text}`;
+  persistDetailFields();
+  renderMessages();
+  renderReport();
+  renderPrintDossier();
+  setDictationStatus("Texte ajouté à la note", "saved");
+}
+
+function startDictation() {
+  if (!currentVisit()) {
+    showToast("Créez une visite avant de dicter la note");
+    return;
+  }
+
+  const Recognition = speechRecognitionConstructor();
+  if (!Recognition) {
+    setDictationStatus(
+      "Dictée non disponible sur ce navigateur. Vous pouvez écrire la note ou conserver un audio original.",
+      "unsupported",
+    );
+    renderDictationControls();
+    return;
+  }
+
+  try {
+    const recognition = new Recognition();
+    recognition.lang = "fr-FR";
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    state.speechRecognition = recognition;
+    state.dictationActive = true;
+    state.dictationStopRequested = false;
+    state.dictationHadError = false;
+    renderDictationControls();
+
+    recognition.addEventListener("result", (event) => {
+      const transcript = Array.from(event.results)
+        .slice(event.resultIndex)
+        .filter((result) => result.isFinal)
+        .map((result) => result[0]?.transcript || "")
+        .join(" ")
+        .trim();
+
+      appendDictatedText(transcript);
+    });
+
+    recognition.addEventListener("error", (event) => {
+      state.dictationHadError = true;
+      state.dictationActive = false;
+      state.speechRecognition = null;
+
+      const microError = ["audio-capture", "not-allowed", "service-not-allowed"].includes(event.error);
+      setDictationStatus(
+        microError ? "Micro refusé ou indisponible" : "Dictée arrêtée",
+        microError ? "error" : "stopped",
+      );
+      renderDictationControls();
+    });
+
+    recognition.addEventListener("end", () => {
+      const stoppedByUser = state.dictationStopRequested;
+      const hadError = state.dictationHadError;
+      state.dictationActive = false;
+      state.dictationStopRequested = false;
+      state.dictationHadError = false;
+      state.speechRecognition = null;
+
+      if (!hadError) {
+        setDictationStatus(stoppedByUser ? "Dictée arrêtée" : "Dictée prête", stoppedByUser ? "stopped" : "ready");
+      }
+      renderDictationControls();
+    });
+
+    recognition.start();
+  } catch {
+    state.dictationActive = false;
+    state.speechRecognition = null;
+    setDictationStatus("Micro refusé ou indisponible", "error");
+    renderDictationControls();
+  }
+}
+
+function stopDictation() {
+  if (!state.speechRecognition || !state.dictationActive) return;
+
+  state.dictationStopRequested = true;
+  try {
+    state.speechRecognition.stop();
+  } catch {
+    state.dictationActive = false;
+    state.speechRecognition = null;
+    setDictationStatus("Dictée arrêtée", "stopped");
+    renderDictationControls();
+  }
+}
+
 function isAudioRecordingSupported() {
   return Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
 }
@@ -811,7 +967,7 @@ function renderVoiceNote() {
 
   if (!isSupported) {
     setVoiceRecordStatus(
-      "L'enregistrement audio n'est pas disponible sur ce navigateur. Vous pouvez utiliser la note écrite.",
+      "L'enregistrement audio n'est pas disponible sur ce navigateur. Vous pouvez utiliser la note de visite.",
       "unsupported",
     );
     return;
@@ -827,18 +983,18 @@ function renderVoiceNote() {
     return;
   }
 
-  setVoiceRecordStatus(voiceNote ? "Note vocale enregistrée." : "Prêt à enregistrer", voiceNote ? "saved" : "ready");
+  setVoiceRecordStatus(voiceNote ? "Audio original enregistré." : "Prêt à enregistrer", voiceNote ? "saved" : "ready");
 }
 
 async function startVoiceRecording() {
   if (!currentVisit()) {
-    showToast("Créez une visite avant d'enregistrer une note vocale");
+    showToast("Créez une visite avant d'enregistrer un audio original");
     return;
   }
 
   if (!isAudioRecordingSupported()) {
     setVoiceRecordStatus(
-      "L'enregistrement audio n'est pas disponible sur ce navigateur. Vous pouvez utiliser la note écrite.",
+      "L'enregistrement audio n'est pas disponible sur ce navigateur. Vous pouvez utiliser la note de visite.",
       "unsupported",
     );
     renderVoiceNote();
@@ -877,7 +1033,7 @@ async function startVoiceRecording() {
       state.audioVisitId = null;
 
       if (chunks.length === 0) {
-        setVoiceRecordStatus("Erreur pendant l'enregistrement. Réessayez ou utilisez la note écrite.", "error");
+        setVoiceRecordStatus("Erreur pendant l'enregistrement. Réessayez ou utilisez la note de visite.", "error");
         renderVoiceNote();
         return;
       }
@@ -897,18 +1053,18 @@ async function startVoiceRecording() {
         }
         if (audioVisitId === currentVisit()?.id) {
           renderDetailMeta();
-          state.audioStatusMessage = "Note vocale enregistrée.";
+          state.audioStatusMessage = "Audio original enregistré.";
           state.audioStatusKind = "saved";
           renderVoiceNote();
           renderMessages();
           renderPrintDossier();
-          showToast("Note vocale enregistrée.");
+          showToast("Audio original enregistré.");
         } else {
           state.audioStatusMessage = "";
           state.audioStatusKind = "";
         }
       } catch {
-        setVoiceRecordStatus("Erreur pendant l'enregistrement. Réessayez ou utilisez la note écrite.", "error");
+        setVoiceRecordStatus("Erreur pendant l'enregistrement. Réessayez ou utilisez la note de visite.", "error");
         renderVoiceNote();
       }
     });
@@ -917,7 +1073,7 @@ async function startVoiceRecording() {
       stopAudioStream();
       state.audioRecorder = null;
       state.audioVisitId = null;
-      setVoiceRecordStatus("Erreur pendant l'enregistrement. Réessayez ou utilisez la note écrite.", "error");
+      setVoiceRecordStatus("Erreur pendant l'enregistrement. Réessayez ou utilisez la note de visite.", "error");
       renderVoiceNote();
     });
 
@@ -930,8 +1086,8 @@ async function startVoiceRecording() {
     const denied = ["NotAllowedError", "SecurityError", "PermissionDeniedError"].includes(error?.name);
     setVoiceRecordStatus(
       denied
-        ? "Accès au micro non autorisé. Autorisez le micro dans les réglages du navigateur ou utilisez la note écrite."
-        : "Erreur pendant l'enregistrement. Réessayez ou utilisez la note écrite.",
+        ? "Accès au micro non autorisé. Autorisez le micro dans les réglages du navigateur ou utilisez la note de visite."
+        : "Erreur pendant l'enregistrement. Réessayez ou utilisez la note de visite.",
       denied ? "denied" : "error",
     );
     renderVoiceNote();
@@ -955,7 +1111,7 @@ function deleteVoiceNote() {
   renderVoiceNote();
   renderMessages();
   renderPrintDossier();
-  showToast("Note vocale supprimée");
+  showToast("Audio original supprimé");
 }
 
 function persistDetailFields() {
@@ -998,7 +1154,7 @@ function renderMessages() {
   const textNote = elements.voiceNote.value.trim();
   const photos = photosForStorage();
   const projectType = elements.projectTypeInput.value.trim() || visit?.projectType || "";
-  const voiceStatus = voiceNoteLabel(visit?.voiceNote);
+  const audioStatus = audioOriginalLabel(visit?.voiceNote);
 
   elements.clientMessage.value = `Objet : Dossier de visite à traiter - ${clientName}
 
@@ -1008,8 +1164,8 @@ Voici le dossier de visite à traiter pour : ${clientName}.
 
 Éléments disponibles :
 - compte-rendu de visite : ${reportStatusLabel(visit?.report)} ;
-- note écrite : ${writtenNoteLabel(textNote)} ;
-- note vocale : ${voiceStatus} ;
+- note de visite : ${writtenNoteLabel(textNote)} ;
+- audio original : ${audioStatus} ;
 - photos : ${photoCountText(photos.length)} ;
 - coordonnées client : ${contactStatusLabel({ phone, email })} ;
 - type d'intervention / chantier : ${projectTypeStatusLabel(projectType)}.
@@ -1056,7 +1212,9 @@ function renderReportNotice(message) {
 }
 
 function printableReportHtml(visite) {
-  const report = polishReportText(visite?.report);
+  const report = visite?.report && !isCurrentReportFormat(visite.report)
+    ? buildReportText(visite)
+    : polishReportText(visite?.report);
 
   if (!report) {
     return `
@@ -1160,7 +1318,8 @@ function renderPrintDossier() {
         <div><dt>Email</dt><dd>${escapeAttr(email)}</dd></div>
         <div><dt>Ville / adresse</dt><dd>${escapeAttr(location)}</dd></div>
         <div><dt>Type d'intervention / chantier</dt><dd>${escapeAttr(projectType)}</dd></div>
-        <div><dt>Note vocale</dt><dd>${escapeAttr(`Note vocale : ${voiceNoteLabel(visite.voiceNote)}`)}</dd></div>
+        <div><dt>Note de visite</dt><dd>${escapeAttr(`Note de visite : ${writtenNoteLabel(visite.textNote)}`)}</dd></div>
+        <div><dt>Audio original</dt><dd>${escapeAttr(`Audio original : ${audioOriginalLabel(visite.voiceNote)}`)}</dd></div>
       </dl>
     </section>
 
@@ -1179,6 +1338,7 @@ function renderPrintDossier() {
 
 function renderAll() {
   renderPhotoGallery();
+  renderDictationControls();
   renderVoiceNote();
   renderMessages();
   renderReport();
@@ -1392,6 +1552,8 @@ elements.detailStatus.addEventListener("change", () => {
 elements.prepareEmailButton.addEventListener("click", prepareInternalTransmission);
 document.querySelector("#printButton").addEventListener("click", printVisitDossier);
 
+elements.dictateNoteButton.addEventListener("click", startDictation);
+elements.stopDictationButton.addEventListener("click", stopDictation);
 elements.voiceRecordButton.addEventListener("click", startVoiceRecording);
 elements.voiceStopButton.addEventListener("click", stopVoiceRecording);
 elements.voiceDeleteButton.addEventListener("click", deleteVoiceNote);

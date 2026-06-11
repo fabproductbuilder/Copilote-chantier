@@ -625,14 +625,53 @@ h2 {
   line-height: 1.45;
 }
 
+.dictation-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 8px;
+  padding: 0 11px 11px;
+}
+
+.dictation-status {
+  grid-column: 1 / -1;
+  min-height: 30px;
+  border-radius: var(--radius);
+  padding: 7px 9px;
+  background: #eef6ff;
+  color: #16467f;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.dictation-status[data-state="recording"] {
+  background: #fff0e6;
+  color: #924b13;
+}
+
+.dictation-status[data-state="saved"] {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.dictation-status[data-state="unsupported"],
+.dictation-status[data-state="error"] {
+  background: #fff1f2;
+  color: #9f1239;
+}
+
+.dictation-status[data-state="stopped"] {
+  background: #f1f5f9;
+  color: #475569;
+}
+
 .audio-note {
   display: grid;
   gap: 10px;
-  margin-top: 12px;
+  margin-top: 10px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 12px;
-  background: #f8fbfc;
+  background: #fff;
 }
 
 .audio-note-header {
@@ -1276,6 +1315,15 @@ h2 {
   .field-grid,
   .totals {
     grid-template-columns: 1fr;
+  }
+
+  .dictation-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .dictation-controls .button {
+    min-height: 48px;
+    width: 100%;
   }
 
   .quote-row {

@@ -286,17 +286,27 @@
               <span class="icon-button active" aria-hidden="true">
                 <svg><use href="#icon-file"></use></svg>
               </span>
-              <span>Note écrite</span>
+              <span>Note de visite</span>
             </div>
-            <p class="note-help">Décrivez la demande, les observations et les points à transmettre.</p>
+            <p class="note-help">Écrivez ou dictez les informations importantes relevées sur place.</p>
             <textarea id="voiceNote">Cuisine et petite salle de bain à refaire. Reprise plomberie sous vasque, dépose ancien meuble, carrelage mural sur 8 m², peinture plafond et finitions. Appartement occupé, accès par ascenseur.</textarea>
+            <div class="dictation-controls" aria-label="Dictée vocale de la note">
+              <button class="button primary" id="dictateNoteButton" type="button">
+                <svg><use href="#icon-mic"></use></svg>
+                Dicter la note
+              </button>
+              <button class="button secondary" id="stopDictationButton" type="button" disabled>
+                Arrêter la dictée
+              </button>
+              <span class="dictation-status" id="dictationStatus">Dictée prête</span>
+            </div>
           </div>
 
           <div class="audio-note" aria-labelledby="audioNoteTitle">
             <div class="audio-note-header">
               <div>
-                <h3 id="audioNoteTitle">Note vocale</h3>
-                <p>Enregistrez rapidement vos observations si vous préférez parler plutôt qu'écrire.</p>
+                <h3 id="audioNoteTitle">Audio original</h3>
+                <p>Optionnel — conservez un enregistrement audio si vous souhaitez garder une trace de la visite.</p>
               </div>
               <span class="audio-status" id="voiceRecordStatus">Prêt à enregistrer</span>
             </div>
@@ -397,6 +407,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="app.js?v=v1-print-polish-20260611"></script>
+    <script src="app.js?v=v1-dictation-notes-20260611"></script>
   </body>
 </html>
