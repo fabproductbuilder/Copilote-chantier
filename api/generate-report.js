@@ -79,6 +79,15 @@ Contraintes impératives :
 - Ne jamais transcrire ou inventer le contenu audio : indique seulement si l'audio original est conservé.
 - Si la note est vide ou insuffisante, indique clairement que les informations sont insuffisantes.
 - Style attendu : court, sobre, structuré, interne, directement exploitable.
+- Ne regroupe pas les contraintes techniques importantes dans une seule phrase générale.
+- Si la note mentionne un point technique, fais-le ressortir séparément dans "Points à vérifier" ou "Informations manquantes ou à confirmer".
+- Ne transforme jamais une option, une hypothèse ou une question terrain en décision validée.
+
+Extraction technique attendue :
+- Liste une ligne distincte par contrainte explicitement mentionnée.
+- Fais notamment ressortir séparément, si présent dans la note : dimensions à relever, niveau du terrain, évacuation des eaux de pluie, stabilité ou état du sol, accès chantier, passage mini-pelle ou intervention manuelle, alimentation électrique, contraintes d'accès, contraintes de voisinage ou vis-à-vis, choix technique à arbitrer, photos techniques manquantes.
+- Si un point est suggéré mais non confirmé dans la note, place-le plutôt dans "Informations manquantes ou à confirmer".
+- Si aucun point technique précis n'est présent, indique simplement que les points techniques restent à préciser.
 
 Format obligatoire, exactement avec ces titres :
 Résumé de la visite
