@@ -69,7 +69,8 @@ const elements = {
   detailStatusPill: document.querySelector("#detailStatusPill"),
   voiceNote: document.querySelector("#voiceNote"),
   clientMessage: document.querySelector("#clientMessage"),
-  prepareEmailButton: document.querySelector("#prepareEmailButton"),
+  finalizeDossierButton: document.querySelector("#finalizeDossierButton"),
+  handoffResult: document.querySelector("#handoffResult"),
   reportCard: document.querySelector("#reportCard"),
   toast: document.querySelector("#toast"),
   mainPhoto: document.querySelector("#mainPhoto"),
@@ -575,7 +576,7 @@ function dossierStatus(visite = {}) {
   if (visite.report) {
     return {
       key: "ready",
-      label: "Prêt à transmettre",
+      label: "Prêt pour traitement interne",
       className: "status-ready",
     };
   }
@@ -721,6 +722,9 @@ function hydrateDetail(visite) {
   elements.clientPhone.value = visite.phone || "";
   elements.clientEmail.value = visite.email || "";
   elements.officeEmail.value = visite.officeEmail || "";
+  if (elements.handoffResult) {
+    elements.handoffResult.hidden = true;
+  }
   elements.projectTypeInput.value = projectTypeLabel(visite.projectType) === "Type d'intervention à préciser" ? "" : projectTypeLabel(visite.projectType);
   elements.detailStatus.value = visite.visitStatus || DEFAULT_VISIT_STATUS;
   elements.voiceNote.value = visite.textNote || "";
@@ -738,7 +742,7 @@ function renderDetailMeta() {
   elements.detailStatusPill.textContent = statusLabels[visite.visitStatus] || statusLabels.draft;
   elements.detailStatusPill.className = `status-pill ${statusClass(visite.visitStatus)}`;
   elements.lastUpdateValue.textContent = formatDate(visite.updatedAt);
-  elements.internalStatusValue.textContent = visite.report ? "Prêt à transmettre" : "À compléter";
+  elements.internalStatusValue.textContent = visite.report ? "Prêt pour traitement interne" : "À compléter";
   const nextActionLabel = visite.report
     ? "À traiter par l'équipe interne"
     : "Compte-rendu à générer avant transmission";
@@ -1153,27 +1157,36 @@ function renderMessages() {
   const visit = currentVisit();
   const textNote = elements.voiceNote.value.trim();
   const photos = photosForStorage();
-  const projectType = elements.projectTypeInput.value.trim() || visit?.projectType || "";
+  const projectType = projectTypeLabel(elements.projectTypeInput.value.trim() || visit?.projectType);
+  const city = elements.clientCity.value.trim() || visit?.city || "Localisation à compléter";
+  const address = firstString(visit?.address);
+  const location = address ? `${address}, ${city}` : city;
   const audioStatus = audioOriginalLabel(visit?.voiceNote);
 
   elements.clientMessage.value = `Objet : Dossier de visite à traiter - ${clientName}
 
 Bonjour,
 
-Voici le dossier de visite à traiter pour : ${clientName}.
+Le dossier de visite est prêt pour traitement interne.
+
+Client : ${clientName}
+Localisation : ${location}
+Type d'intervention / chantier : ${projectType}
 
 Éléments disponibles :
 - compte-rendu de visite : ${reportStatusLabel(visit?.report)} ;
 - note de visite : ${writtenNoteLabel(textNote)} ;
 - audio original : ${audioStatus} ;
 - photos : ${photoCountText(photos.length)} ;
-- coordonnées client : ${contactStatusLabel({ phone, email })} ;
-- type d'intervention / chantier : ${projectTypeStatusLabel(projectType)}.
+- coordonnées client : ${contactStatusLabel({ phone, email })}.
 
 Prochaine action :
-Vérifier les informations collectées et préparer le traitement interne du dossier.
+Vérifier les informations collectées et poursuivre le traitement du dossier.`;
+}
 
-Le compte-rendu détaillé est disponible dans le bloc "Compte-rendu de visite".`;
+function showHandoffResult() {
+  if (!elements.handoffResult) return;
+  elements.handoffResult.hidden = false;
 }
 
 function renderReport() {
@@ -1403,12 +1416,13 @@ async function copyText(text, fallbackElement) {
   }
 }
 
-function prepareInternalTransmission() {
+function finalizeDossierForInternalTreatment() {
   persistDetailFields();
   renderMessages();
   renderDetailMeta();
+  showHandoffResult();
   copyText(elements.clientMessage.value, elements.clientMessage);
-  showToast("Envoi du dossier préparé à copier");
+  showToast("Message interne préparé");
 }
 
 function printVisitDossier() {
@@ -1549,7 +1563,7 @@ elements.detailStatus.addEventListener("change", () => {
   });
 });
 
-elements.prepareEmailButton.addEventListener("click", prepareInternalTransmission);
+elements.finalizeDossierButton.addEventListener("click", finalizeDossierForInternalTreatment);
 document.querySelector("#printButton").addEventListener("click", printVisitDossier);
 
 elements.dictateNoteButton.addEventListener("click", startDictation);

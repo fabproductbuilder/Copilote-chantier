@@ -80,13 +80,6 @@
             <svg><use href="#icon-plus"></use></svg>
             Nouvelle visite
           </button>
-          <div class="print-action detail-only">
-            <button class="button secondary" id="printButton" type="button">
-              <svg><use href="#icon-print"></use></svg>
-              Imprimer / Enregistrer en PDF
-            </button>
-            <p>Dans l'aperçu d'impression, vous pouvez choisir "Enregistrer en PDF". Pour un rendu plus propre, désactivez les en-têtes et pieds de page du navigateur.</p>
-          </div>
         </div>
       </header>
 
@@ -114,7 +107,7 @@
                 <strong id="draftFoldersCount">0</strong>
               </div>
               <div class="metric">
-                <span>Prêts à transmettre</span>
+                <span>Prêts pour traitement interne</span>
                 <strong id="sentFoldersCount">0</strong>
               </div>
               <div class="metric">
@@ -188,7 +181,7 @@
               <select id="statusFilter">
                 <option value="all">Tous</option>
                 <option value="incomplete">À compléter</option>
-                <option value="ready">Prêts à transmettre</option>
+                <option value="ready">Prêts pour traitement interne</option>
                 <option value="transmitted">Transmis</option>
               </select>
             </label>
@@ -350,24 +343,36 @@
             <div class="panel-header compact">
               <div>
                 <p class="eyebrow">Équipe interne</p>
-                <h2 id="actionsTitle">Transmission interne</h2>
+                <h2 id="actionsTitle">Finaliser le dossier</h2>
+                <p>Préparez le dossier de visite pour son traitement par l'équipe interne.</p>
               </div>
             </div>
 
             <div class="tab-panel active" id="tab-message">
               <label class="field">
-                <span>Email équipe interne / destinataire</span>
-                <input id="officeEmail" inputmode="email" placeholder="interne@entreprise.fr" />
+                <span>Destinataire interne (optionnel)</span>
+                <input id="officeEmail" placeholder="ex : équipe travaux" />
               </label>
               <label class="field">
                 <span>Message interne</span>
               </label>
               <textarea id="clientMessage" class="message-text"></textarea>
+              <div class="handoff-result" id="handoffResult" hidden>
+                <strong>Dossier prêt pour traitement interne</strong>
+                <span>Message interne préparé — à copier ou à utiliser avec le dossier.</span>
+              </div>
               <div class="button-row">
-                <button class="button primary stretch" id="prepareEmailButton" type="button">
+                <button class="button primary stretch" id="finalizeDossierButton" type="button">
                   <svg><use href="#icon-send"></use></svg>
-                  Préparer l'envoi du dossier
+                  Finaliser pour traitement interne
                 </button>
+              </div>
+              <div class="print-action secondary-action">
+                <button class="button secondary stretch" id="printButton" type="button">
+                  <svg><use href="#icon-print"></use></svg>
+                  Imprimer / Enregistrer en PDF
+                </button>
+                <p>Optionnel — utile pour archiver ou partager une version PDF du dossier.</p>
               </div>
             </div>
           </section>
@@ -407,6 +412,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="app.js?v=v1-dictation-notes-20260611"></script>
+    <script src="app.js?v=v1-finalize-dossier-20260612"></script>
   </body>
 </html>

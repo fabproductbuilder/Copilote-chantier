@@ -141,6 +141,13 @@ svg {
   line-height: 1.35;
 }
 
+.secondary-action {
+  max-width: none;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
 body[data-view="home"] .detail-only {
   display: none;
 }
@@ -1136,6 +1143,30 @@ h2 {
 .message-text.compact-message {
   min-height: 104px;
   background: #f8fbfc;
+}
+
+.handoff-result {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 10px;
+  border: 1px solid var(--green);
+  border-radius: var(--radius);
+  padding: 10px;
+  background: var(--green-soft);
+  color: #14532d;
+}
+
+.handoff-result[hidden] {
+  display: none;
+}
+
+.handoff-result strong {
+  font-size: 14px;
+}
+
+.handoff-result span {
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 .actions-panel .button {
