@@ -107,11 +107,11 @@
                 <strong id="draftFoldersCount">0</strong>
               </div>
               <div class="metric">
-                <span>Prêts pour traitement interne</span>
+                <span>Prêts à finaliser</span>
                 <strong id="sentFoldersCount">0</strong>
               </div>
               <div class="metric">
-                <span>Transmis</span>
+                <span>Prêts pour traitement interne</span>
                 <strong id="acceptedFoldersCount">0</strong>
               </div>
             </div>
@@ -181,7 +181,8 @@
               <select id="statusFilter">
                 <option value="all">Tous</option>
                 <option value="incomplete">À compléter</option>
-                <option value="ready">Prêts pour traitement interne</option>
+                <option value="ready">Prêts à finaliser</option>
+                <option value="finalized">Prêts pour traitement interne</option>
                 <option value="transmitted">Transmis</option>
               </select>
             </label>
@@ -397,11 +398,8 @@
             </div>
 
             <div class="next-step">
-              <span>Prochaine action</span>
-              <button class="next-action" id="nextAction" type="button">
-                À traiter par l'équipe interne
-                <svg><use href="#icon-chevron"></use></svg>
-              </button>
+              <span>Prochaine étape</span>
+              <strong class="next-action-value" id="nextAction">Compte-rendu à générer avant finalisation</strong>
             </div>
           </section>
         </aside>
@@ -412,6 +410,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="app.js?v=v1-finalize-dossier-20260612"></script>
+    <script src="app.js?v=v1-internal-tracking-20260612"></script>
   </body>
 </html>

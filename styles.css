@@ -1210,23 +1210,16 @@ h2 {
 
 .next-step {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   margin-top: 12px;
 }
 
-.next-action {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  width: 100%;
-  min-height: 48px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--rose-soft);
-  color: #78283b;
-  padding: 0 10px 0 12px;
+.next-action-value {
+  display: block;
+  color: var(--ink);
+  font-size: 15px;
   font-weight: 850;
+  line-height: 1.35;
   text-align: left;
 }
 

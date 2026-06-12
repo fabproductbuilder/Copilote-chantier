@@ -405,7 +405,7 @@ function buildReportText(visit = {}) {
   const email = firstString(visit.email) || "Email à compléter";
   const projectType = projectTypeLabel(visit.projectType);
   const photos = Array.isArray(visit.photos) ? visit.photos : [];
-  const nextAction = "Préparer la transmission du dossier pour traitement interne.";
+  const nextAction = "Finaliser le dossier pour traitement interne.";
 
   return `Résumé de la visite
 Client : ${clientName}
@@ -455,6 +455,7 @@ function createVisit(overrides = {}) {
     voiceTranscript: firstString(overrides.voiceTranscript),
     report: sanitizeLegacyReportText(firstString(overrides.report)),
     pdfGeneratedAt: overrides.pdfGeneratedAt || null,
+    finalizedAt: overrides.finalizedAt || null,
 
     analyzedAt: overrides.analyzedAt || null,
   };
@@ -483,6 +484,7 @@ function normalizeVisit(raw = {}) {
     voiceTranscript: raw.voiceTranscript,
     report: sanitizeLegacyReportText(firstString(raw.report)),
     pdfGeneratedAt: raw.pdfGeneratedAt || null,
+    finalizedAt: raw.finalizedAt || null,
   });
 
   const report = normalized.report && !isCurrentReportFormat(normalized.report)
@@ -573,10 +575,18 @@ function dossierStatus(visite = {}) {
     };
   }
 
+  if (visite.finalizedAt) {
+    return {
+      key: "finalized",
+      label: "Prêt pour traitement interne",
+      className: "status-ready",
+    };
+  }
+
   if (visite.report) {
     return {
       key: "ready",
-      label: "Prêt pour traitement interne",
+      label: "Prêt à finaliser",
       className: "status-ready",
     };
   }
@@ -585,6 +595,27 @@ function dossierStatus(visite = {}) {
     key: "incomplete",
     label: "À compléter",
     className: "status-draft",
+  };
+}
+
+function internalTrackingState(visite = {}) {
+  if (visite.finalizedAt) {
+    return {
+      status: "Prêt pour traitement interne",
+      nextStep: "Traitement par l'équipe interne",
+    };
+  }
+
+  if (visite.report) {
+    return {
+      status: "Prêt à finaliser",
+      nextStep: "Finaliser le dossier pour traitement interne",
+    };
+  }
+
+  return {
+    status: "À compléter",
+    nextStep: "Compte-rendu à générer avant finalisation",
   };
 }
 
@@ -601,13 +632,13 @@ function renderHome() {
     total: state.visites.length,
     incomplete: state.visites.filter((visite) => dossierStatus(visite).key === "incomplete").length,
     ready: state.visites.filter((visite) => dossierStatus(visite).key === "ready").length,
-    transmitted: state.visites.filter((visite) => dossierStatus(visite).key === "transmitted").length,
+    finalized: state.visites.filter((visite) => dossierStatus(visite).key === "finalized").length,
   };
 
   elements.totalFoldersCount.textContent = totals.total;
   elements.draftFoldersCount.textContent = totals.incomplete;
   elements.sentFoldersCount.textContent = totals.ready;
-  elements.acceptedFoldersCount.textContent = totals.transmitted;
+  elements.acceptedFoldersCount.textContent = totals.finalized;
 
   const filter = elements.statusFilter.value;
   const visites = state.visites
@@ -742,11 +773,9 @@ function renderDetailMeta() {
   elements.detailStatusPill.textContent = statusLabels[visite.visitStatus] || statusLabels.draft;
   elements.detailStatusPill.className = `status-pill ${statusClass(visite.visitStatus)}`;
   elements.lastUpdateValue.textContent = formatDate(visite.updatedAt);
-  elements.internalStatusValue.textContent = visite.report ? "Prêt pour traitement interne" : "À compléter";
-  const nextActionLabel = visite.report
-    ? "À traiter par l'équipe interne"
-    : "Compte-rendu à générer avant transmission";
-  elements.nextAction.innerHTML = `${nextActionLabel}<svg><use href="#icon-chevron"></use></svg>`;
+  const tracking = internalTrackingState(visite);
+  elements.internalStatusValue.textContent = tracking.status;
+  elements.nextAction.textContent = tracking.nextStep;
   renderPrintDossier();
 }
 
@@ -1305,9 +1334,7 @@ function renderPrintDossier() {
   const location = address ? `${address}, ${city}` : city;
   const projectType = projectTypeLabel(visite.projectType);
   const dossierDate = formatShortDate(visite.createdAt || visite.updatedAt || new Date());
-  const nextActionLabel = visite.report
-    ? "À traiter par l'équipe interne"
-    : "Compte-rendu à générer avant transmission";
+  const tracking = internalTrackingState(visite);
 
   elements.printDossier.innerHTML = `
     <header class="print-header">
@@ -1342,8 +1369,8 @@ function renderPrintDossier() {
     <section class="print-block">
       <h2>Suivi interne</h2>
       <dl class="print-info-grid">
-        <div><dt>Statut du dossier</dt><dd>${escapeAttr(status.label)}</dd></div>
-        <div><dt>Prochaine action interne</dt><dd>${escapeAttr(nextActionLabel)}</dd></div>
+        <div><dt>Statut du dossier</dt><dd>${escapeAttr(tracking.status || status.label)}</dd></div>
+        <div><dt>Prochaine étape</dt><dd>${escapeAttr(tracking.nextStep)}</dd></div>
       </dl>
     </section>
   `;
@@ -1418,6 +1445,14 @@ async function copyText(text, fallbackElement) {
 
 function finalizeDossierForInternalTreatment() {
   persistDetailFields();
+  if (!currentVisit()?.report) {
+    renderMessages();
+    renderDetailMeta();
+    showToast("Compte-rendu à générer avant finalisation");
+    return;
+  }
+
+  updateVisit({ finalizedAt: nowIso() });
   renderMessages();
   renderDetailMeta();
   showHandoffResult();
@@ -1571,10 +1606,6 @@ elements.stopDictationButton.addEventListener("click", stopDictation);
 elements.voiceRecordButton.addEventListener("click", startVoiceRecording);
 elements.voiceStopButton.addEventListener("click", stopVoiceRecording);
 elements.voiceDeleteButton.addEventListener("click", deleteVoiceNote);
-
-document.querySelector("#nextAction").addEventListener("click", () => {
-  showToast("Dossier à traiter par l'équipe interne");
-});
 
 elements.photoGallery.addEventListener("click", (event) => {
   const deleteButton = event.target.closest("[data-photo-delete]");
