@@ -4,7 +4,7 @@ const DEFAULT_PHOTO = "assets/chantier-renovation.png";
 const MAX_PHOTOS_PER_VISIT = 8;
 const PHOTO_MAX_DIMENSION = 1400;
 const PHOTO_JPEG_QUALITY = 0.72;
-const MIN_REPORT_NOTE_LENGTH = 18;
+const AI_REPORT_ENDPOINT = "/api/generate-report";
 
 const visitStorage = {
   read(key) {
@@ -89,6 +89,7 @@ const elements = {
   stopDictationButton: document.querySelector("#stopDictationButton"),
   dictationStatus: document.querySelector("#dictationStatus"),
   printDossier: document.querySelector("#printDossier"),
+  generateButton: document.querySelector("#generateButton"),
 };
 
 const state = {
@@ -246,10 +247,6 @@ async function compressPhotoFile(file) {
   }
 }
 
-function hasEnoughVisitNote(textNote) {
-  return String(textNote || "").trim().replace(/\s+/g, " ").length >= MIN_REPORT_NOTE_LENGTH;
-}
-
 function reportPhotoLabel(count) {
   if (count === 0) return "Aucune photo jointe pour le moment.";
   return `${photoLabel(count)} jointe${count > 1 ? "s" : ""} à la visite.`;
@@ -280,6 +277,10 @@ function contactStatusLabel({ phone, email }) {
 
 function projectTypeStatusLabel(projectType) {
   return firstString(projectType) ? "renseigné" : "à préciser";
+}
+
+function normalizeReportMode(value) {
+  return value === "ai" ? "ai" : "simple";
 }
 
 function photoCountText(count) {
@@ -324,11 +325,11 @@ function sanitizeLegacyReportText(report) {
     .filter((line) => {
       const trimmed = line.trim();
       const lowerLine = trimmed.toLowerCase();
-      const startsSafeSection = /^(Résumé de la visite|Demande du client|Éléments collectés|Photos jointes|Informations pour traitement interne|Prochaine action)$/i.test(
+      const startsSafeSection = /^(Résumé de la visite|Demande du client|Demande \/ observations|Travaux évoqués|Points à vérifier|Informations manquantes ou à confirmer|Photos et éléments disponibles|Éléments collectés|Photos jointes|Informations pour traitement interne|Prochaine action|Prochaine action interne)$/i.test(
         trimmed,
       );
 
-      if (/^Points/i.test(trimmed) || blockedTerms.some((term) => lowerLine.includes(term))) {
+      if (blockedTerms.some((term) => lowerLine.includes(term))) {
         skipLegacyRows = true;
         return false;
       }
@@ -383,7 +384,7 @@ function polishReportText(report) {
 
 function isCurrentReportFormat(report) {
   const cleanedReport = polishReportText(report);
-  return [
+  const simpleSections = [
     "Résumé de la visite",
     "Demande / observations",
     "Éléments collectés",
@@ -393,7 +394,18 @@ function isCurrentReportFormat(report) {
     "Photos jointes",
     "Informations pour traitement interne",
     "Prochaine action",
-  ].every((term) => cleanedReport.includes(term));
+  ];
+  const aiSections = [
+    "Résumé de la visite",
+    "Demande / observations",
+    "Travaux évoqués",
+    "Points à vérifier",
+    "Informations manquantes ou à confirmer",
+    "Photos et éléments disponibles",
+    "Prochaine action interne",
+  ];
+
+  return [simpleSections, aiSections].some((sections) => sections.every((term) => cleanedReport.includes(term)));
 }
 
 function buildReportText(visit = {}) {
@@ -405,29 +417,39 @@ function buildReportText(visit = {}) {
   const email = firstString(visit.email) || "Email à compléter";
   const projectType = projectTypeLabel(visit.projectType);
   const photos = Array.isArray(visit.photos) ? visit.photos : [];
+  const noteStatus = writtenNoteLabel(note);
+  const audioStatus = audioOriginalLabel(visit.voiceNote);
   const nextAction = "Finaliser le dossier pour traitement interne.";
+  const demandText = note || "Informations insuffisantes : ajoutez une note de visite pour préciser les observations terrain.";
+  const summaryText = note
+    ? `Visite ${projectType.toLowerCase()} pour ${clientName}.`
+    : "Informations insuffisantes pour établir un résumé détaillé de la visite.";
 
   return `Résumé de la visite
-Client : ${clientName}
-Type d'intervention / chantier : ${projectType}
-Localisation : ${address ? `${address}, ${city}` : city}
-Contact : ${phone} / ${email}
+${summaryText}
 
 Demande / observations
-${note}
+${demandText}
 
-Éléments collectés
+Travaux évoqués
+Type d'intervention / chantier : ${projectType}
+Se référer à la note de visite pour les éléments explicitement relevés sur place.
+
+Points à vérifier
+À vérifier par l'équipe interne à partir des informations collectées pendant la visite.
+
+Informations manquantes ou à confirmer
+${note ? "À compléter si nécessaire pendant le traitement interne du dossier." : "Note de visite insuffisante ou non renseignée."}
+
+Photos et éléments disponibles
+Client : ${clientName}
+Localisation : ${address ? `${address}, ${city}` : city}
+Contact : ${phone} / ${email}
 Nombre de photos : ${photos.length}
-Note de visite : ${writtenNoteLabel(note)}
-Audio original : ${audioOriginalLabel(visit.voiceNote)}
+Note de visite : ${noteStatus}
+Audio original : ${audioStatus}
 
-Photos jointes
-${reportPhotoLabel(photos.length)}
-
-Informations pour traitement interne
-${internalTreatmentInfoText(note)}
-
-Prochaine action
+Prochaine action interne
 ${nextAction}`;
 }
 
@@ -454,6 +476,7 @@ function createVisit(overrides = {}) {
     voiceNote: normalizeVoiceNote(overrides.voiceNote),
     voiceTranscript: firstString(overrides.voiceTranscript),
     report: sanitizeLegacyReportText(firstString(overrides.report)),
+    reportMode: normalizeReportMode(overrides.reportMode),
     pdfGeneratedAt: overrides.pdfGeneratedAt || null,
     finalizedAt: overrides.finalizedAt || null,
 
@@ -483,6 +506,7 @@ function normalizeVisit(raw = {}) {
     voiceNote: normalizeVoiceNote(raw.voiceNote),
     voiceTranscript: raw.voiceTranscript,
     report: sanitizeLegacyReportText(firstString(raw.report)),
+    reportMode: normalizeReportMode(raw.reportMode),
     pdfGeneratedAt: raw.pdfGeneratedAt || null,
     finalizedAt: raw.finalizedAt || null,
   });
@@ -1392,19 +1416,8 @@ function showToast(message) {
   showToast.timeout = setTimeout(() => elements.toast.classList.remove("show"), 2600);
 }
 
-function analyzeVisit() {
-  const textNote = elements.voiceNote.value.trim();
-
-  persistDetailFields();
-
-  if (!hasEnoughVisitNote(textNote)) {
-    renderReportNotice("Ajoutez une note de visite plus détaillée avant de générer le compte-rendu.");
-    showToast("Note de visite à compléter avant génération");
-    return;
-  }
-
-  state.analyzedAt = new Date();
-  const report = buildReportText({
+function buildReportVisitSnapshot(textNote) {
+  return {
     ...currentVisit(),
     clientName: elements.clientName.value.trim() || "Nouveau client",
     phone: elements.clientPhone.value.trim(),
@@ -1414,17 +1427,98 @@ function analyzeVisit() {
     visitStatus: elements.detailStatus.value,
     textNote,
     photos: photosForStorage(),
+  };
+}
+
+function buildAiReportPayload(visit) {
+  return {
+    dossierType: "Chantier / travaux",
+    clientName: firstString(visit.clientName),
+    phone: firstString(visit.phone),
+    email: firstString(visit.email),
+    city: firstString(visit.city),
+    address: firstString(visit.address),
+    projectType: projectTypeLabel(visit.projectType),
+    textNote: firstString(visit.textNote),
+    photoCount: Array.isArray(visit.photos) ? visit.photos.length : 0,
+    audioOriginal: Boolean(normalizeVoiceNote(visit.voiceNote)),
+    visitDate: firstString(visit.createdAt || visit.updatedAt),
+  };
+}
+
+function setReportGenerationLoading(isLoading) {
+  elements.generateButton.disabled = isLoading;
+  elements.generateButton.innerHTML = isLoading
+    ? `<svg><use href="#icon-zap"></use></svg>Génération en cours…`
+    : `<svg><use href="#icon-zap"></use></svg>Générer le compte-rendu`;
+}
+
+async function requestAiReport(visit) {
+  const response = await fetch(AI_REPORT_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(buildAiReportPayload(visit)),
   });
+
+  let data = {};
+  try {
+    data = await response.json();
+  } catch {
+    data = {};
+  }
+
+  if (!response.ok || !data.ok || !data.report) {
+    const error = new Error(data.message || "AI report unavailable");
+    error.reason = data.reason || "ai_unavailable";
+    throw error;
+  }
+
+  return sanitizeLegacyReportText(data.report);
+}
+
+function aiFallbackToast(reason) {
+  return reason === "missing_api_key"
+    ? "IA non configurée : compte-rendu simple généré."
+    : "Compte-rendu simple généré. L'IA n'est pas disponible pour le moment.";
+}
+
+async function analyzeVisit() {
+  const textNote = elements.voiceNote.value.trim();
+
+  persistDetailFields();
+
+  state.analyzedAt = new Date();
+  const visitSnapshot = buildReportVisitSnapshot(textNote);
+  let report = "";
+  let reportMode = "simple";
+  let toastMessage = "Compte-rendu IA généré";
+
+  renderReportNotice("Génération du compte-rendu IA en cours…");
+  setReportGenerationLoading(true);
+
+  try {
+    report = await requestAiReport(visitSnapshot);
+    if (!report) throw Object.assign(new Error("Empty AI report"), { reason: "invalid_ai_output" });
+    reportMode = "ai";
+  } catch (error) {
+    report = buildReportText(visitSnapshot);
+    reportMode = "simple";
+    toastMessage = aiFallbackToast(error.reason);
+  } finally {
+    setReportGenerationLoading(false);
+  }
 
   updateVisit({
     projectType: normalizeProjectType(elements.projectTypeInput.value),
     textNote,
     report,
+    reportMode,
     analyzedAt: state.analyzedAt.toISOString(),
+    finalizedAt: null,
   });
   renderAll();
   renderDetailMeta();
-  showToast("Compte-rendu généré, dossier prêt à vérifier");
+  showToast(toastMessage);
 }
 
 async function copyText(text, fallbackElement) {
