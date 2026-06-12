@@ -111,7 +111,7 @@
                 <strong id="sentFoldersCount">0</strong>
               </div>
               <div class="metric">
-                <span>Prêts pour traitement interne</span>
+                <span>Envoyés pour traitement interne</span>
                 <strong id="acceptedFoldersCount">0</strong>
               </div>
             </div>
@@ -183,7 +183,7 @@
                 <option value="incomplete">À compléter</option>
                 <option value="ready">Prêts à finaliser</option>
                 <option value="finalized">Prêts pour traitement interne</option>
-                <option value="transmitted">Transmis</option>
+                <option value="sent">Envoyés pour traitement interne</option>
               </select>
             </label>
           </div>
@@ -351,8 +351,8 @@
 
             <div class="tab-panel active" id="tab-message">
               <label class="field">
-                <span>Destinataire interne (optionnel)</span>
-                <input id="officeEmail" placeholder="ex : équipe travaux" />
+                <span>Email de l'équipe interne</span>
+                <input id="officeEmail" inputmode="email" placeholder="bureau@entreprise.fr" />
               </label>
               <label class="field">
                 <span>Message interne</span>
@@ -365,7 +365,7 @@
               <div class="button-row">
                 <button class="button primary stretch" id="finalizeDossierButton" type="button">
                   <svg><use href="#icon-send"></use></svg>
-                  Finaliser pour traitement interne
+                  Envoyer le dossier à l'équipe interne
                 </button>
               </div>
               <div class="print-action secondary-action">
@@ -410,6 +410,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="app.js?v=v3-ai-report-20260612"></script>
+    <script src="app.js?v=v32-email-dossier-20260612"></script>
   </body>
 </html>

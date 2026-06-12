@@ -5,6 +5,7 @@ const MAX_PHOTOS_PER_VISIT = 8;
 const PHOTO_MAX_DIMENSION = 1400;
 const PHOTO_JPEG_QUALITY = 0.72;
 const AI_REPORT_ENDPOINT = "/api/generate-report";
+const SEND_DOSSIER_ENDPOINT = "/api/send-dossier";
 
 const visitStorage = {
   read(key) {
@@ -271,8 +272,16 @@ function reportStatusLabel(report) {
   return sanitizeLegacyReportText(report) ? "généré" : "à générer";
 }
 
+function reportModeLabel(value) {
+  return value === "ai" ? "IA" : "simple";
+}
+
 function contactStatusLabel({ phone, email }) {
   return firstString(phone) && firstString(email) ? "complètes" : "à compléter";
+}
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 }
 
 function projectTypeStatusLabel(projectType) {
@@ -479,6 +488,7 @@ function createVisit(overrides = {}) {
     reportMode: normalizeReportMode(overrides.reportMode),
     pdfGeneratedAt: overrides.pdfGeneratedAt || null,
     finalizedAt: overrides.finalizedAt || null,
+    sentAt: overrides.sentAt || null,
 
     analyzedAt: overrides.analyzedAt || null,
   };
@@ -509,6 +519,7 @@ function normalizeVisit(raw = {}) {
     reportMode: normalizeReportMode(raw.reportMode),
     pdfGeneratedAt: raw.pdfGeneratedAt || null,
     finalizedAt: raw.finalizedAt || null,
+    sentAt: raw.sentAt || null,
   });
 
   const report = normalized.report && !isCurrentReportFormat(normalized.report)
@@ -591,10 +602,18 @@ function statusClass(status) {
 }
 
 function dossierStatus(visite = {}) {
+  if (visite.sentAt) {
+    return {
+      key: "sent",
+      label: "Dossier envoyé à l'équipe interne",
+      className: "status-sent",
+    };
+  }
+
   if (visite.transmittedAt || visite.visitStatus === "transmitted") {
     return {
-      key: "transmitted",
-      label: "Transmis",
+      key: "sent",
+      label: "Dossier envoyé à l'équipe interne",
       className: "status-sent",
     };
   }
@@ -623,6 +642,13 @@ function dossierStatus(visite = {}) {
 }
 
 function internalTrackingState(visite = {}) {
+  if (visite.sentAt) {
+    return {
+      status: "Dossier envoyé à l'équipe interne",
+      nextStep: "Traitement par l'équipe interne",
+    };
+  }
+
   if (visite.finalizedAt) {
     return {
       status: "Prêt pour traitement interne",
@@ -656,13 +682,13 @@ function renderHome() {
     total: state.visites.length,
     incomplete: state.visites.filter((visite) => dossierStatus(visite).key === "incomplete").length,
     ready: state.visites.filter((visite) => dossierStatus(visite).key === "ready").length,
-    finalized: state.visites.filter((visite) => dossierStatus(visite).key === "finalized").length,
+    sent: state.visites.filter((visite) => dossierStatus(visite).key === "sent").length,
   };
 
   elements.totalFoldersCount.textContent = totals.total;
   elements.draftFoldersCount.textContent = totals.incomplete;
   elements.sentFoldersCount.textContent = totals.ready;
-  elements.acceptedFoldersCount.textContent = totals.finalized;
+  elements.acceptedFoldersCount.textContent = totals.sent;
 
   const filter = elements.statusFilter.value;
   const visites = state.visites
@@ -1197,7 +1223,7 @@ function getClientFirstName() {
 function internalReportText(report) {
   const cleanedReport = polishReportText(report);
   if (!cleanedReport) {
-    return "Compte-rendu de visite : à générer avant transmission.";
+    return "Compte-rendu de visite : à générer avant envoi.";
   }
 
   return `Compte-rendu de visite :\n${cleanedReport}`;
@@ -1215,30 +1241,42 @@ function renderMessages() {
   const address = firstString(visit?.address);
   const location = address ? `${address}, ${city}` : city;
   const audioStatus = audioOriginalLabel(visit?.voiceNote);
+  const report = polishReportText(visit?.report) || "Compte-rendu à générer avant envoi.";
 
   elements.clientMessage.value = `Objet : Dossier de visite à traiter - ${clientName}
 
 Bonjour,
 
-Le dossier de visite est prêt pour traitement interne.
+Un dossier de visite a été finalisé pour traitement interne.
 
 Client : ${clientName}
 Localisation : ${location}
 Type d'intervention / chantier : ${projectType}
+Téléphone : ${phone || "Téléphone à compléter"}
+Email : ${email || "Email à compléter"}
 
 Éléments disponibles :
 - compte-rendu de visite : ${reportStatusLabel(visit?.report)} ;
+- mode compte-rendu : ${reportModeLabel(visit?.reportMode)} ;
 - note de visite : ${writtenNoteLabel(textNote)} ;
-- audio original : ${audioStatus} ;
 - photos : ${photoCountText(photos.length)} ;
-- coordonnées client : ${contactStatusLabel({ phone, email })}.
+- audio original : ${audioStatus === "conservé" ? "conservé localement" : "non conservé"}.
+
+Compte-rendu de visite :
+${report}
 
 Prochaine action :
-Vérifier les informations collectées et poursuivre le traitement du dossier.`;
+Vérifier les informations collectées et poursuivre le traitement du dossier dans l'outil habituel de l'entreprise.
+
+Ce message a été généré automatiquement par Copilote Chantier.`;
 }
 
-function showHandoffResult() {
+function showHandoffResult(title = "Dossier prêt pour traitement interne", message = "Message interne préparé — à copier ou à utiliser avec le dossier.") {
   if (!elements.handoffResult) return;
+  elements.handoffResult.innerHTML = `
+    <strong>${escapeAttr(title)}</strong>
+    <span>${escapeAttr(message)}</span>
+  `;
   elements.handoffResult.hidden = false;
 }
 
@@ -1476,6 +1514,64 @@ async function requestAiReport(visit) {
   return sanitizeLegacyReportText(data.report);
 }
 
+function buildSendDossierPayload(visit) {
+  const photos = photosForStorage();
+  const textNote = elements.voiceNote.value.trim();
+  const projectType = normalizeProjectType(elements.projectTypeInput.value);
+
+  return {
+    to: elements.officeEmail.value.trim(),
+    clientName: elements.clientName.value.trim() || visit.clientName || "Nouveau client",
+    phone: elements.clientPhone.value.trim(),
+    clientEmail: elements.clientEmail.value.trim(),
+    city: elements.clientCity.value.trim(),
+    address: firstString(visit.address),
+    projectType: projectTypeLabel(projectType || visit.projectType),
+    textNote,
+    report: polishReportText(visit.report),
+    reportMode: normalizeReportMode(visit.reportMode),
+    photoCount: photos.length,
+    photos: photos.map((photo) => ({
+      dataUrl: photo.dataUrl,
+      name: photo.name,
+    })),
+    audioOriginal: Boolean(normalizeVoiceNote(visit.voiceNote)),
+    visitDate: firstString(visit.createdAt || visit.updatedAt),
+    status: internalTrackingState(visit).status,
+  };
+}
+
+function setDossierSendingLoading(isLoading) {
+  elements.finalizeDossierButton.disabled = isLoading;
+  elements.finalizeDossierButton.innerHTML = isLoading
+    ? `<svg><use href="#icon-send"></use></svg>Envoi en cours…`
+    : `<svg><use href="#icon-send"></use></svg>Envoyer le dossier à l'équipe interne`;
+}
+
+async function requestSendDossier(payload) {
+  const response = await fetch(SEND_DOSSIER_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  let data = {};
+  try {
+    data = await response.json();
+  } catch {
+    data = {};
+  }
+
+  if (!response.ok || !data.ok) {
+    const error = new Error(data.message || "Envoi impossible. Le dossier reste prêt pour traitement interne.");
+    error.reason = data.reason || "send_failed";
+    error.userMessage = data.message;
+    throw error;
+  }
+
+  return data;
+}
+
 function aiFallbackToast(reason) {
   return reason === "missing_api_key"
     ? "IA non configurée : compte-rendu simple généré."
@@ -1515,6 +1611,7 @@ async function analyzeVisit() {
     reportMode,
     analyzedAt: state.analyzedAt.toISOString(),
     finalizedAt: null,
+    sentAt: null,
   });
   renderAll();
   renderDetailMeta();
@@ -1537,21 +1634,70 @@ async function copyText(text, fallbackElement) {
   }
 }
 
-function finalizeDossierForInternalTreatment() {
+async function finalizeDossierForInternalTreatment() {
   persistDetailFields();
-  if (!currentVisit()?.report) {
+  const visit = currentVisit();
+  if (!visit?.report) {
     renderMessages();
     renderDetailMeta();
     showToast("Compte-rendu à générer avant finalisation");
     return;
   }
 
-  updateVisit({ finalizedAt: nowIso() });
-  renderMessages();
-  renderDetailMeta();
-  showHandoffResult();
-  copyText(elements.clientMessage.value, elements.clientMessage);
-  showToast("Message interne préparé");
+  const recipientEmail = elements.officeEmail.value.trim();
+  if (!recipientEmail) {
+    showToast("Adresse email interne à renseigner.");
+    return;
+  }
+
+  if (!isValidEmail(recipientEmail)) {
+    showToast("Adresse email interne invalide.");
+    return;
+  }
+
+  showHandoffResult("Préparation du dossier…", "Les informations de visite sont préparées pour l'équipe interne.");
+  showToast("Préparation du dossier…");
+  setDossierSendingLoading(true);
+
+  try {
+    const payload = buildSendDossierPayload(visit);
+    showHandoffResult("Envoi du dossier en cours…", "Le dossier est transmis à l'équipe interne.");
+    showToast("Envoi du dossier en cours…");
+    const result = await requestSendDossier(payload);
+    const sentAt = nowIso();
+
+    updateVisit({
+      officeEmail: recipientEmail,
+      finalizedAt: sentAt,
+      sentAt,
+    });
+    renderMessages();
+    renderDetailMeta();
+    renderHome();
+
+    const photoMessage = result.photosSkipped
+      ? "Dossier envoyé. Les photos n'ont pas été jointes car leur taille dépasse la limite prévue pour l'envoi email."
+      : "Dossier envoyé avec les éléments de visite disponibles.";
+    showHandoffResult("Dossier envoyé à l'équipe interne", photoMessage);
+    showToast("Dossier envoyé à l'équipe interne.");
+  } catch (error) {
+    const finalizedAt = nowIso();
+    updateVisit({
+      officeEmail: recipientEmail,
+      finalizedAt,
+    });
+    renderMessages();
+    renderDetailMeta();
+    renderHome();
+
+    const message = error.reason === "service_not_configured"
+      ? "Service d'envoi non configuré. Le dossier reste prêt pour traitement interne."
+      : error.userMessage || "Envoi impossible. Le dossier reste prêt pour traitement interne.";
+    showHandoffResult("Dossier prêt pour traitement interne", message);
+    showToast(message);
+  } finally {
+    setDossierSendingLoading(false);
+  }
 }
 
 function printVisitDossier() {
