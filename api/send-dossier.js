@@ -127,9 +127,6 @@ ${photoWarning}
 Compte-rendu de visite :
 ${payload.report}
 
-Prochaine action :
-Vérifier les informations collectées et poursuivre le traitement du dossier dans l'outil habituel de l'entreprise.
-
 Ce message a été généré automatiquement par Copilote Chantier.`;
 }
 
