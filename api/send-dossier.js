@@ -146,6 +146,39 @@ function sendJson(res, statusCode, payload) {
   res.end(JSON.stringify(payload));
 }
 
+function errorMessageForReason(reason) {
+  const messages = {
+    service_not_configured: "Service d'envoi non configuré. Le dossier reste prêt pour traitement interne.",
+    invalid_recipient: "Adresse email interne invalide.",
+    missing_recipient: "Adresse email interne à renseigner.",
+    payload_too_large: "Envoi impossible. Le dossier est trop volumineux.",
+    attachment_error: "Envoi impossible avec les photos jointes. Le dossier reste prêt pour traitement interne.",
+    resend_domain_not_verified: "Envoi impossible : le domaine d'expéditeur n'est pas vérifié dans Resend.",
+    resend_sender_invalid: "Envoi impossible : l'expéditeur configuré n'est pas accepté par Resend.",
+    resend_api_error: "Envoi impossible : Resend a refusé la demande.",
+  };
+
+  return messages[reason] || "Envoi impossible. Le dossier reste prêt pour traitement interne.";
+}
+
+function classifyResendError(status, bodyText) {
+  const message = String(bodyText || "").toLowerCase();
+
+  if (message.includes("domain") && (message.includes("verify") || message.includes("verified"))) {
+    return "resend_domain_not_verified";
+  }
+
+  if (message.includes("from") || message.includes("sender")) {
+    return "resend_sender_invalid";
+  }
+
+  if (status === 401 || status === 403) {
+    return "resend_api_error";
+  }
+
+  return "resend_api_error";
+}
+
 function readStreamBody(req) {
   return new Promise((resolve, reject) => {
     let raw = "";
@@ -184,7 +217,30 @@ module.exports = async function handler(req, res) {
 
   const contentLength = Number(req.headers?.["content-length"] || 0);
   if (contentLength > MAX_BODY_BYTES) {
-    sendJson(res, 413, { ok: false, reason: "body_too_large", message: "Envoi impossible. Le dossier reste prêt pour traitement interne." });
+    sendJson(res, 413, { ok: false, reason: "payload_too_large", message: errorMessageForReason("payload_too_large") });
+    return;
+  }
+
+  let payload;
+  try {
+    payload = normalizePayload(await readBody(req));
+  } catch (error) {
+    const reason = error.message === "body_too_large" ? "payload_too_large" : "invalid_payload";
+    sendJson(res, reason === "payload_too_large" ? 413 : 400, {
+      ok: false,
+      reason,
+      message: reason === "payload_too_large" ? errorMessageForReason("payload_too_large") : "Envoi impossible. Le dossier reste prêt pour traitement interne.",
+    });
+    return;
+  }
+
+  if (!payload.to) {
+    sendJson(res, 400, { ok: false, reason: "missing_recipient", message: errorMessageForReason("missing_recipient") });
+    return;
+  }
+
+  if (!isValidEmail(payload.to)) {
+    sendJson(res, 400, { ok: false, reason: "invalid_recipient", message: errorMessageForReason("invalid_recipient") });
     return;
   }
 
@@ -194,35 +250,23 @@ module.exports = async function handler(req, res) {
     sendJson(res, 503, {
       ok: false,
       reason: "service_not_configured",
-      message: "Service d'envoi non configuré. Le dossier reste prêt pour traitement interne.",
+      message: errorMessageForReason("service_not_configured"),
     });
-    return;
-  }
-
-  let payload;
-  try {
-    payload = normalizePayload(await readBody(req));
-  } catch (error) {
-    sendJson(res, error.message === "body_too_large" ? 413 : 400, {
-      ok: false,
-      reason: error.message === "body_too_large" ? "body_too_large" : "invalid_payload",
-      message: "Envoi impossible. Le dossier reste prêt pour traitement interne.",
-    });
-    return;
-  }
-
-  if (!payload.to) {
-    sendJson(res, 400, { ok: false, reason: "missing_recipient", message: "Adresse email interne à renseigner." });
-    return;
-  }
-
-  if (!isValidEmail(payload.to)) {
-    sendJson(res, 400, { ok: false, reason: "invalid_recipient", message: "Adresse email interne invalide." });
     return;
   }
 
   const location = locationLabel(payload);
-  const { attachments, photosSkipped } = buildAttachments(payload.photos);
+  let attachments = [];
+  let photosSkipped = false;
+
+  try {
+    const attachmentResult = buildAttachments(payload.photos);
+    attachments = attachmentResult.attachments;
+    photosSkipped = attachmentResult.photosSkipped;
+  } catch {
+    sendJson(res, 400, { ok: false, reason: "attachment_error", message: errorMessageForReason("attachment_error") });
+    return;
+  }
 
   try {
     const response = await fetch(RESEND_EMAILS_URL, {
@@ -242,7 +286,9 @@ module.exports = async function handler(req, res) {
     });
 
     if (!response.ok) {
-      sendJson(res, 502, { ok: false, reason: "send_failed", message: "Envoi impossible. Le dossier reste prêt pour traitement interne." });
+      const errorText = await response.text();
+      const reason = classifyResendError(response.status, errorText);
+      sendJson(res, 502, { ok: false, reason, message: errorMessageForReason(reason) });
       return;
     }
 
