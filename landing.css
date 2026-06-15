@@ -305,6 +305,16 @@ h1 {
   margin-top: 16px;
 }
 
+.offer-list {
+  margin: 12px 0 0;
+  padding-left: 1.2rem;
+  color: var(--muted);
+}
+
+.offer-list li {
+  margin: 7px 0;
+}
+
 .offer-actions {
   justify-content: flex-end;
   margin-top: 0;
@@ -360,23 +370,74 @@ h1 {
     position: static;
     align-items: flex-start;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
+    min-height: 0;
+    padding: 12px 16px;
+  }
+
+  .brand {
+    min-width: 0;
+  }
+
+  .brand img {
+    width: min(156px, 58vw);
   }
 
   .site-nav {
     width: 100%;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px 12px;
     margin-left: 0;
-    overflow-x: auto;
-    padding-bottom: 4px;
+    overflow-x: visible;
+    padding-bottom: 0;
+    font-size: 0.86rem;
+    line-height: 1.2;
   }
 
   .nav-cta {
     width: 100%;
+    min-height: 44px;
   }
 
   .hero,
   .hero-overlay {
-    min-height: 720px;
+    min-height: 540px;
+  }
+
+  .hero-overlay {
+    align-items: flex-start;
+    padding: 38px 18px 30px;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 10vw, 2.4rem);
+    line-height: 1.03;
+  }
+
+  .hero-copy {
+    margin-top: 16px;
+    font-size: 1rem;
+  }
+
+  .hero-actions {
+    margin-top: 22px;
+  }
+
+  .trust-note {
+    margin-top: 18px;
+    font-size: 0.9rem;
+  }
+
+  .section {
+    width: min(1120px, calc(100% - 32px));
+    padding: 44px 0;
+  }
+
+  .solution-band,
+  .limit-section {
+    width: 100%;
+    padding: 44px 16px;
   }
 
   .two-columns,
@@ -384,6 +445,21 @@ h1 {
   .offer-section,
   .steps {
     grid-template-columns: 1fr;
+  }
+
+  .step {
+    min-height: 0;
+    padding: 20px;
+  }
+
+  .audience-list span {
+    width: 100%;
+  }
+
+  .offer-section {
+    width: min(1120px, calc(100% - 32px));
+    padding: 24px 18px;
+    margin-bottom: 44px;
   }
 
   .offer-actions {
