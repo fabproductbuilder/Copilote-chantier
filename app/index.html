@@ -61,7 +61,40 @@
       </symbol>
     </svg>
 
-    <div class="app-shell">
+    <section class="license-screen" id="licenseScreen" aria-labelledby="licenseTitle">
+      <div class="license-card">
+        <img
+          class="license-logo"
+          src="/assets/logo-copilote-chantier.svg"
+          alt="Copilote Chantier"
+        />
+        <p class="eyebrow">Accès application</p>
+        <h1 id="licenseTitle">Code d'accès</h1>
+        <p>
+          Entrez votre code pour accéder à l'application. Vos dossiers restent stockés
+          localement sur cet appareil.
+        </p>
+        <form class="license-form" id="licenseForm">
+          <label class="field">
+            <span>Code d'accès</span>
+            <input
+              id="licenseCodeInput"
+              autocomplete="one-time-code"
+              autocapitalize="characters"
+              spellcheck="false"
+              placeholder="Ex : DEMO-CHANTIER-001"
+            />
+          </label>
+          <button class="button primary stretch" id="licenseSubmitButton" type="submit">
+            Accéder à l'application
+          </button>
+          <p class="license-error" id="licenseError" role="alert"></p>
+        </form>
+        <a class="license-offer-link" href="/">Site / Offre</a>
+      </div>
+    </section>
+
+    <div class="app-shell" id="appShell" hidden>
       <header class="topbar">
         <button class="brand" id="brandHomeButton" type="button" aria-label="Retour à l'accueil">
           <img
@@ -82,6 +115,13 @@
           </button>
         </div>
       </header>
+
+      <section class="license-banner" id="licenseBanner" hidden>
+        <span class="license-badge" id="licenseBadge">Licence active</span>
+        <span id="licenseCustomer">Client</span>
+        <strong id="licenseQuota">Quota IA restant : -</strong>
+        <button class="license-change" id="changeLicenseButton" type="button">Changer de code</button>
+      </section>
 
       <main class="home-view" id="homeView">
         <section class="home-grid">
@@ -414,6 +454,6 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="/app.js?v=landing-app-route-20260615"></script>
+    <script src="/app.js?v=license-quota-airtable-20260615"></script>
   </body>
 </html>

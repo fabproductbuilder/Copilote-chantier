@@ -1,6 +1,7 @@
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const DEFAULT_MODEL = "gpt-5.5";
 const MAX_TEXT_LENGTH = 5000;
+const { incrementLicenseUsage, licenseMessage, validateLicenseCode } = require("./_airtable-license");
 
 function term(...parts) {
   return parts.join("");
@@ -47,6 +48,7 @@ function normalizePayload(input = {}) {
   const date = textValue(input.visitDate || input.createdAt || input.updatedAt);
 
   return {
+    licenseCode: textValue(input.licenseCode),
     dossierType: "Chantier / travaux",
     clientName: textValue(input.clientName, "Client à compléter"),
     phone: textValue(input.phone),
@@ -102,6 +104,11 @@ Données de visite :
 ${JSON.stringify(payload, null, 2)}`;
 }
 
+function buildPromptPayload(payload) {
+  const { licenseCode, ...safePayload } = payload;
+  return safePayload;
+}
+
 function extractOutputText(data) {
   if (typeof data?.output_text === "string") {
     return data.output_text.trim();
@@ -153,21 +160,38 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    sendJson(res, 503, {
-      ok: false,
-      reason: "missing_api_key",
-      message: "IA non configurée : compte-rendu simple généré.",
-    });
-    return;
-  }
-
   let payload;
   try {
     payload = normalizePayload(readBody(req));
   } catch {
     sendJson(res, 400, { ok: false, reason: "invalid_payload" });
+    return;
+  }
+
+  const licenseResult = await validateLicenseCode(payload.licenseCode, { requireQuota: true });
+  if (!licenseResult.valid) {
+    const statusCode = licenseResult.reason === "quota_exhausted"
+      ? 402
+      : ["service_not_configured", "airtable_unavailable"].includes(licenseResult.reason)
+        ? 503
+        : 403;
+
+    sendJson(res, statusCode, {
+      ok: false,
+      reason: licenseResult.reason,
+      message: licenseResult.message || licenseMessage(licenseResult.reason),
+      quotaRemaining: licenseResult.license?.quotaRemaining,
+    });
+    return;
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    sendJson(res, 503, {
+      ok: false,
+      reason: "openai_unavailable",
+      message: "OpenAI indisponible. Réessayez dans quelques instants.",
+    });
     return;
   }
 
@@ -195,7 +219,7 @@ module.exports = async function handler(req, res) {
             content: [
               {
                 type: "input_text",
-                text: buildPrompt(payload),
+                text: buildPrompt(buildPromptPayload(payload)),
               },
             ],
           },
@@ -206,7 +230,11 @@ module.exports = async function handler(req, res) {
     });
 
     if (!response.ok) {
-      sendJson(res, 502, { ok: false, reason: "ai_unavailable" });
+      sendJson(res, 502, {
+        ok: false,
+        reason: "openai_unavailable",
+        message: "OpenAI indisponible. Réessayez dans quelques instants.",
+      });
       return;
     }
 
@@ -218,12 +246,29 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    const usageResult = await incrementLicenseUsage(licenseResult.license);
+    if (!usageResult.ok) {
+      sendJson(res, 503, {
+        ok: false,
+        reason: usageResult.reason,
+        message: usageResult.message,
+      });
+      return;
+    }
+
     sendJson(res, 200, {
       ok: true,
       report,
       reportMode: "ai",
+      quotaTotal: usageResult.quotaTotal,
+      quotaUsed: usageResult.quotaUsed,
+      quotaRemaining: usageResult.quotaRemaining,
     });
   } catch {
-    sendJson(res, 502, { ok: false, reason: "ai_unavailable" });
+    sendJson(res, 502, {
+      ok: false,
+      reason: "openai_unavailable",
+      message: "OpenAI indisponible. Réessayez dans quelques instants.",
+    });
   }
 };

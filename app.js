@@ -1,10 +1,12 @@
 const STORAGE_KEY = "copiloteChantier.visites.v1";
 const LEGACY_STORAGE_KEY = "copiloteChantier.dossiers.v1";
+const LICENSE_STORAGE_KEY = "copiloteChantier.license.v1";
 const DEFAULT_PHOTO = "/assets/chantier-renovation.png";
 const MAX_PHOTOS_PER_VISIT = 8;
 const PHOTO_MAX_DIMENSION = 1400;
 const PHOTO_JPEG_QUALITY = 0.72;
 const AI_REPORT_ENDPOINT = "/api/generate-report";
+const LICENSE_VALIDATE_ENDPOINT = "/api/validate-license";
 const SEND_DOSSIER_ENDPOINT = "/api/send-dossier";
 
 const visitStorage = {
@@ -22,6 +24,50 @@ const visitStorage = {
   },
 };
 
+function loadStoredLicense() {
+  try {
+    const rawLicense = JSON.parse(localStorage.getItem(LICENSE_STORAGE_KEY) || "null");
+    if (
+      !rawLicense ||
+      typeof rawLicense !== "object" ||
+      !firstString(rawLicense.licenseCode) ||
+      !firstString(rawLicense.validatedAt)
+    ) {
+      return null;
+    }
+
+    return {
+      licenseCode: firstString(rawLicense.licenseCode),
+      licenseType: firstString(rawLicense.licenseType, rawLicense.type) || "paid",
+      customerName: firstString(rawLicense.customerName),
+      quotaTotal: Number.isFinite(Number(rawLicense.quotaTotal)) ? Number(rawLicense.quotaTotal) : 0,
+      quotaUsed: Number.isFinite(Number(rawLicense.quotaUsed)) ? Number(rawLicense.quotaUsed) : 0,
+      quotaRemaining: Number.isFinite(Number(rawLicense.quotaRemaining)) ? Number(rawLicense.quotaRemaining) : 0,
+      validatedAt: firstString(rawLicense.validatedAt),
+    };
+  } catch {
+    localStorage.removeItem(LICENSE_STORAGE_KEY);
+    return null;
+  }
+}
+
+function saveStoredLicense(license) {
+  if (!license?.licenseCode) return;
+  localStorage.setItem(LICENSE_STORAGE_KEY, JSON.stringify({
+    licenseCode: license.licenseCode,
+    licenseType: license.licenseType || license.type || "paid",
+    customerName: license.customerName || "",
+    quotaTotal: Number(license.quotaTotal) || 0,
+    quotaUsed: Number(license.quotaUsed) || 0,
+    quotaRemaining: Number(license.quotaRemaining) || 0,
+    validatedAt: nowIso(),
+  }));
+}
+
+function clearStoredLicense() {
+  localStorage.removeItem(LICENSE_STORAGE_KEY);
+}
+
 const visitTypeLabels = {
   renovation: "Rénovation",
   plomberie: "Plomberie",
@@ -38,6 +84,17 @@ const DEFAULT_PROJECT_TYPE = "";
 const DEFAULT_VISIT_STATUS = "draft";
 
 const elements = {
+  licenseScreen: document.querySelector("#licenseScreen"),
+  licenseForm: document.querySelector("#licenseForm"),
+  licenseCodeInput: document.querySelector("#licenseCodeInput"),
+  licenseSubmitButton: document.querySelector("#licenseSubmitButton"),
+  licenseError: document.querySelector("#licenseError"),
+  appShell: document.querySelector("#appShell"),
+  licenseBanner: document.querySelector("#licenseBanner"),
+  licenseBadge: document.querySelector("#licenseBadge"),
+  licenseCustomer: document.querySelector("#licenseCustomer"),
+  licenseQuota: document.querySelector("#licenseQuota"),
+  changeLicenseButton: document.querySelector("#changeLicenseButton"),
   homeView: document.querySelector("#homeView"),
   detailView: document.querySelector("#detailView"),
   brandHomeButton: document.querySelector("#brandHomeButton"),
@@ -96,6 +153,7 @@ const elements = {
 const state = {
   currentId: null,
   visites: loadVisits(),
+  license: loadStoredLicense(),
   visitType: "renovation",
   analyzedAt: new Date(),
   photoQueue: Promise.resolve(),
@@ -1454,6 +1512,184 @@ function showToast(message) {
   showToast.timeout = setTimeout(() => elements.toast.classList.remove("show"), 2600);
 }
 
+function normalizeLicenseResponse(data, licenseCode) {
+  return {
+    licenseCode,
+    licenseType: firstString(data.type) || "paid",
+    customerName: firstString(data.customerName),
+    quotaTotal: Number(data.quotaTotal) || 0,
+    quotaUsed: Number(data.quotaUsed) || 0,
+    quotaRemaining: Number(data.quotaRemaining) || 0,
+  };
+}
+
+function licenseTypeLabel(type) {
+  return type === "demo" ? "Démo" : "Licence active";
+}
+
+function renderLicenseBanner() {
+  if (!elements.licenseBanner) return;
+
+  const license = state.license;
+  elements.licenseBanner.hidden = !license;
+  if (!license) return;
+
+  elements.licenseBadge.textContent = licenseTypeLabel(license.licenseType);
+  elements.licenseCustomer.textContent = license.customerName || "Accès actif";
+  elements.licenseQuota.textContent = `Quota IA restant : ${Math.max(0, Number(license.quotaRemaining) || 0)}`;
+}
+
+function showLicensedApp() {
+  if (elements.licenseScreen) elements.licenseScreen.hidden = true;
+  if (elements.appShell) elements.appShell.hidden = false;
+  renderLicenseBanner();
+}
+
+function showLicenseGate(message = "") {
+  if (elements.appShell) elements.appShell.hidden = true;
+  if (elements.licenseScreen) elements.licenseScreen.hidden = false;
+  if (elements.licenseError) elements.licenseError.textContent = message;
+  if (elements.licenseCodeInput) {
+    elements.licenseCodeInput.value = "";
+    window.setTimeout(() => elements.licenseCodeInput.focus(), 0);
+  }
+}
+
+function setLicenseLoading(isLoading) {
+  if (!elements.licenseSubmitButton) return;
+  elements.licenseSubmitButton.disabled = isLoading;
+  elements.licenseSubmitButton.textContent = isLoading ? "Vérification…" : "Accéder à l'application";
+}
+
+async function validateLicenseCodeClient(licenseCode) {
+  const response = await fetch(LICENSE_VALIDATE_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ licenseCode }),
+  });
+
+  let data = {};
+  try {
+    data = await response.json();
+  } catch {
+    data = {};
+  }
+
+  if (!response.ok || !data.valid) {
+    const error = new Error(data.message || "Code d'accès impossible à vérifier.");
+    error.reason = data.reason || "license_validation_failed";
+    error.userMessage = data.message;
+    throw error;
+  }
+
+  return normalizeLicenseResponse(data, licenseCode);
+}
+
+async function refreshStoredLicense() {
+  if (!state.license?.licenseCode) return;
+
+  try {
+    const license = await validateLicenseCodeClient(state.license.licenseCode);
+    state.license = license;
+    saveStoredLicense(license);
+    renderLicenseBanner();
+  } catch (error) {
+    if (["license_not_found", "license_blocked", "license_expired", "license_inactive"].includes(error.reason)) {
+      clearStoredLicense();
+      state.license = null;
+      showLicenseGate(error.userMessage || "Code d'accès invalide.");
+      return;
+    }
+
+    renderLicenseBanner();
+    showToast(error.userMessage || "Licence non vérifiée pour le moment.");
+  }
+}
+
+function initializeLicenseAccess() {
+  if (state.license?.licenseCode) {
+    showLicensedApp();
+    refreshStoredLicense();
+    return;
+  }
+
+  showLicenseGate();
+}
+
+async function submitLicenseCode(event) {
+  event.preventDefault();
+  const licenseCode = elements.licenseCodeInput.value.trim();
+
+  if (!licenseCode) {
+    elements.licenseError.textContent = "Code d'accès à renseigner.";
+    return;
+  }
+
+  setLicenseLoading(true);
+  elements.licenseError.textContent = "";
+
+  try {
+    const license = await validateLicenseCodeClient(licenseCode);
+    state.license = license;
+    saveStoredLicense(license);
+    showLicensedApp();
+    showToast("Licence validée");
+  } catch (error) {
+    elements.licenseError.textContent = error.userMessage || "Code d'accès invalide.";
+  } finally {
+    setLicenseLoading(false);
+  }
+}
+
+function changeLicenseCode() {
+  clearStoredLicense();
+  state.license = null;
+  showLicenseGate("Saisissez un nouveau code d'accès.");
+}
+
+function updateLicenseQuotaFromResponse(data) {
+  if (!state.license || !Number.isFinite(Number(data.quotaRemaining))) return;
+
+  state.license = {
+    ...state.license,
+    quotaTotal: Number(data.quotaTotal) || state.license.quotaTotal || 0,
+    quotaUsed: Number(data.quotaUsed) || state.license.quotaUsed || 0,
+    quotaRemaining: Number(data.quotaRemaining) || 0,
+  };
+  saveStoredLicense(state.license);
+  renderLicenseBanner();
+}
+
+function isAiLicenseBlockReason(reason) {
+  return [
+    "missing_license_code",
+    "license_required",
+    "license_not_found",
+    "license_blocked",
+    "license_expired",
+    "license_inactive",
+    "quota_exhausted",
+    "service_not_configured",
+    "airtable_unavailable",
+  ].includes(reason);
+}
+
+function aiLicenseBlockMessage(reason, fallback) {
+  const messages = {
+    missing_license_code: "Code d'accès requis pour générer un compte-rendu IA.",
+    license_required: "Code d'accès requis pour générer un compte-rendu IA.",
+    license_not_found: "Code d'accès invalide.",
+    license_blocked: "Licence bloquée. Contactez-nous pour réactiver l'accès.",
+    license_expired: "Licence expirée. Contactez-nous pour renouveler l'accès.",
+    license_inactive: "Licence inactive. Contactez-nous pour vérifier votre accès.",
+    quota_exhausted: "Quota IA atteint. Contactez-nous pour acheter une recharge de 100 générations.",
+    service_not_configured: "Service de licences non configuré.",
+    airtable_unavailable: "Service de licences indisponible. Réessayez dans quelques instants.",
+  };
+
+  return fallback || messages[reason] || "Compte-rendu IA impossible pour le moment.";
+}
+
 function buildReportVisitSnapshot(textNote) {
   return {
     ...currentVisit(),
@@ -1492,10 +1728,21 @@ function setReportGenerationLoading(isLoading) {
 }
 
 async function requestAiReport(visit) {
+  const licenseCode = state.license?.licenseCode || loadStoredLicense()?.licenseCode;
+  if (!licenseCode) {
+    const error = new Error("License required");
+    error.reason = "license_required";
+    error.userMessage = "Code d'accès requis pour générer un compte-rendu IA.";
+    throw error;
+  }
+
   const response = await fetch(AI_REPORT_ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(buildAiReportPayload(visit)),
+    body: JSON.stringify({
+      ...buildAiReportPayload(visit),
+      licenseCode,
+    }),
   });
 
   let data = {};
@@ -1508,9 +1755,14 @@ async function requestAiReport(visit) {
   if (!response.ok || !data.ok || !data.report) {
     const error = new Error(data.message || "AI report unavailable");
     error.reason = data.reason || "ai_unavailable";
+    error.userMessage = data.message;
+    if (Number.isFinite(Number(data.quotaRemaining)) && state.license) {
+      updateLicenseQuotaFromResponse(data);
+    }
     throw error;
   }
 
+  updateLicenseQuotaFromResponse(data);
   return sanitizeLegacyReportText(data.report);
 }
 
@@ -1573,8 +1825,8 @@ async function requestSendDossier(payload) {
 }
 
 function aiFallbackToast(reason) {
-  return reason === "missing_api_key"
-    ? "IA non configurée : compte-rendu simple généré."
+  return reason === "missing_api_key" || reason === "openai_unavailable"
+    ? "OpenAI indisponible : compte-rendu simple généré."
     : "Compte-rendu simple généré. L'IA n'est pas disponible pour le moment.";
 }
 
@@ -1597,6 +1849,14 @@ async function analyzeVisit() {
     if (!report) throw Object.assign(new Error("Empty AI report"), { reason: "invalid_ai_output" });
     reportMode = "ai";
   } catch (error) {
+    if (isAiLicenseBlockReason(error.reason)) {
+      const message = aiLicenseBlockMessage(error.reason, error.userMessage);
+      renderReportNotice(message);
+      showToast(message);
+      renderLicenseBanner();
+      return;
+    }
+
     report = buildReportText(visitSnapshot);
     reportMode = "simple";
     toastMessage = aiFallbackToast(error.reason);
@@ -1846,6 +2106,8 @@ elements.stopDictationButton.addEventListener("click", stopDictation);
 elements.voiceRecordButton.addEventListener("click", startVoiceRecording);
 elements.voiceStopButton.addEventListener("click", stopVoiceRecording);
 elements.voiceDeleteButton.addEventListener("click", deleteVoiceNote);
+elements.licenseForm.addEventListener("submit", submitLicenseCode);
+elements.changeLicenseButton.addEventListener("click", changeLicenseCode);
 
 elements.photoGallery.addEventListener("click", (event) => {
   const deleteButton = event.target.closest("[data-photo-delete]");
@@ -1865,3 +2127,4 @@ elements.photoInput.addEventListener("change", async (event) => {
 saveVisits();
 renderHome();
 setView("home");
+initializeLicenseAccess();

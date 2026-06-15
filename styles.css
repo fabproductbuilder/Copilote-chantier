@@ -73,6 +73,67 @@ svg {
   display: none;
 }
 
+.license-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+}
+
+.license-card {
+  width: min(460px, 100%);
+  padding: 26px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.license-logo {
+  display: block;
+  width: min(220px, 62vw);
+  height: auto;
+  margin-bottom: 22px;
+  mix-blend-mode: multiply;
+}
+
+.license-card h1 {
+  margin: 0 0 10px;
+  font-size: clamp(28px, 8vw, 40px);
+  line-height: 1.02;
+}
+
+.license-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.license-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.license-error {
+  min-height: 20px;
+  color: var(--rose);
+  font-size: 13px;
+}
+
+.license-offer-link {
+  display: inline-flex;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.license-offer-link:hover {
+  color: var(--blue);
+  text-decoration: underline;
+}
+
 .app-shell {
   width: min(1480px, calc(100vw - 28px));
   margin: 0 auto;
@@ -122,6 +183,44 @@ svg {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.license-banner {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.license-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 9px;
+  color: var(--green);
+  background: var(--green-soft);
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.license-banner strong {
+  color: var(--ink);
+}
+
+.license-change {
+  border: 0;
+  padding: 0;
+  color: var(--blue);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.license-change:hover {
+  text-decoration: underline;
 }
 
 .app-footer {
@@ -1281,6 +1380,15 @@ h2 {
 }
 
 @media (max-width: 780px) {
+  .license-screen {
+    align-items: start;
+    padding: 18px;
+  }
+
+  .license-card {
+    padding: 20px;
+  }
+
   .app-shell {
     width: min(100vw - 18px, 680px);
     padding-top: 8px;
@@ -1309,6 +1417,18 @@ h2 {
 
   .topbar-actions .button {
     white-space: normal;
+  }
+
+  .license-banner {
+    align-items: flex-start;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 7px 10px;
+    padding: 8px 0 4px;
+  }
+
+  .license-banner strong {
+    flex: 1 1 100%;
   }
 
   .print-action {
