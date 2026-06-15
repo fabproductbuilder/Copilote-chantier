@@ -1,6 +1,6 @@
 const STORAGE_KEY = "copiloteChantier.visites.v1";
 const LEGACY_STORAGE_KEY = "copiloteChantier.dossiers.v1";
-const DEFAULT_PHOTO = "assets/chantier-renovation.png";
+const DEFAULT_PHOTO = "/assets/chantier-renovation.png";
 const MAX_PHOTOS_PER_VISIT = 8;
 const PHOTO_MAX_DIMENSION = 1400;
 const PHOTO_JPEG_QUALITY = 0.72;
