@@ -258,6 +258,15 @@ svg {
   line-height: 1.35;
 }
 
+.generation-error {
+  width: 100%;
+  min-height: 18px;
+  margin: 2px 0 0;
+  color: var(--rose);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
 .secondary-action {
   max-width: none;
   margin-top: 12px;

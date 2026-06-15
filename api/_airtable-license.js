@@ -29,9 +29,21 @@ function licenseMessage(reason) {
     license_expired: "Licence expirée. Contactez-nous pour renouveler l'accès.",
     license_inactive: "Licence inactive. Contactez-nous pour vérifier votre accès.",
     quota_exhausted: "Quota IA atteint. Contactez-nous pour acheter une recharge de 100 générations.",
+    quota_update_failed: "Impossible de mettre à jour le quota IA. Vérifiez la configuration Airtable.",
   };
 
   return messages[reason] || "Licence impossible à vérifier.";
+}
+
+function logLicenseEvent(step, details = {}) {
+  console.warn("[license]", {
+    step,
+    ...details,
+  });
+}
+
+function todayIsoDate() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function formulaString(value) {
@@ -97,6 +109,7 @@ function publicLicensePayload(license) {
 async function findLicenseByCode(licenseCode) {
   const config = getConfig();
   if (!config) {
+    logLicenseEvent("config", { reason: "service_not_configured" });
     return { valid: false, reason: "service_not_configured", message: licenseMessage("service_not_configured") };
   }
 
@@ -111,23 +124,27 @@ async function findLicenseByCode(licenseCode) {
       method: "GET",
       headers: airtableHeaders(config),
     });
-  } catch {
+  } catch (error) {
+    logLicenseEvent("read", { reason: "airtable_unavailable", error: error?.name || "fetch_error" });
     return { valid: false, reason: "airtable_unavailable", message: licenseMessage("airtable_unavailable") };
   }
 
   if (!response.ok) {
+    logLicenseEvent("read", { reason: "airtable_unavailable", status: response.status });
     return { valid: false, reason: "airtable_unavailable", message: licenseMessage("airtable_unavailable") };
   }
 
   let data;
   try {
     data = await response.json();
-  } catch {
+  } catch (error) {
+    logLicenseEvent("read", { reason: "airtable_unavailable", error: error?.name || "json_error" });
     return { valid: false, reason: "airtable_unavailable", message: licenseMessage("airtable_unavailable") };
   }
 
   const license = normalizeLicenseRecord(Array.isArray(data.records) ? data.records[0] : null);
   if (!license) {
+    logLicenseEvent("read", { reason: "license_not_found" });
     return { valid: false, reason: "license_not_found", message: licenseMessage("license_not_found") };
   }
 
@@ -137,6 +154,7 @@ async function findLicenseByCode(licenseCode) {
 async function validateLicenseCode(licenseCode, options = {}) {
   const normalizedCode = firstString(licenseCode);
   if (!normalizedCode) {
+    logLicenseEvent("validate", { reason: "missing_license_code" });
     return { valid: false, reason: "missing_license_code", message: licenseMessage("missing_license_code") };
   }
 
@@ -150,14 +168,17 @@ async function validateLicenseCode(licenseCode, options = {}) {
       : license.status === "expired"
         ? "license_expired"
         : "license_inactive";
+    logLicenseEvent("validate", { reason, status: license.status, recordId: license.recordId });
     return { valid: false, reason, message: licenseMessage(reason), license };
   }
 
   if (isExpired(license.expiresAt)) {
+    logLicenseEvent("validate", { reason: "license_expired", recordId: license.recordId });
     return { valid: false, reason: "license_expired", message: licenseMessage("license_expired"), license };
   }
 
   if (options.requireQuota && license.quotaUsed >= license.quotaTotal) {
+    logLicenseEvent("validate", { reason: "quota_exhausted", recordId: license.recordId });
     return { valid: false, reason: "quota_exhausted", message: licenseMessage("quota_exhausted"), license };
   }
 
@@ -171,6 +192,7 @@ async function validateLicenseCode(licenseCode, options = {}) {
 async function incrementLicenseUsage(license) {
   const config = getConfig();
   if (!config) {
+    logLicenseEvent("write", { reason: "service_not_configured" });
     return { ok: false, reason: "service_not_configured", message: licenseMessage("service_not_configured") };
   }
 
@@ -183,23 +205,26 @@ async function incrementLicenseUsage(license) {
       body: JSON.stringify({
         fields: {
           quotaUsed,
-          lastUsedAt: new Date().toISOString(),
+          lastUsedAt: todayIsoDate(),
         },
       }),
     });
-  } catch {
-    return { ok: false, reason: "airtable_unavailable", message: licenseMessage("airtable_unavailable") };
+  } catch (error) {
+    logLicenseEvent("write", { reason: "quota_update_failed", error: error?.name || "fetch_error", recordId: license.recordId });
+    return { ok: false, reason: "quota_update_failed", message: licenseMessage("quota_update_failed") };
   }
 
   if (!response.ok) {
-    return { ok: false, reason: "airtable_unavailable", message: licenseMessage("airtable_unavailable") };
+    logLicenseEvent("write", { reason: "quota_update_failed", status: response.status, recordId: license.recordId });
+    return { ok: false, reason: "quota_update_failed", message: licenseMessage("quota_update_failed") };
   }
 
   let data;
   try {
     data = await response.json();
-  } catch {
-    return { ok: false, reason: "airtable_unavailable", message: licenseMessage("airtable_unavailable") };
+  } catch (error) {
+    logLicenseEvent("write", { reason: "quota_update_failed", error: error?.name || "json_error", recordId: license.recordId });
+    return { ok: false, reason: "quota_update_failed", message: licenseMessage("quota_update_failed") };
   }
 
   const updatedLicense = normalizeLicenseRecord(data) || {

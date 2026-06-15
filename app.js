@@ -130,6 +130,7 @@ const elements = {
   finalizeDossierButton: document.querySelector("#finalizeDossierButton"),
   handoffResult: document.querySelector("#handoffResult"),
   reportCard: document.querySelector("#reportCard"),
+  reportGenerationError: document.querySelector("#reportGenerationError"),
   toast: document.querySelector("#toast"),
   mainPhoto: document.querySelector("#mainPhoto"),
   photoCount: document.querySelector("#photoCount"),
@@ -1512,6 +1513,11 @@ function showToast(message) {
   showToast.timeout = setTimeout(() => elements.toast.classList.remove("show"), 2600);
 }
 
+function showReportGenerationError(message = "") {
+  if (!elements.reportGenerationError) return;
+  elements.reportGenerationError.textContent = message;
+}
+
 function normalizeLicenseResponse(data, licenseCode) {
   return {
     licenseCode,
@@ -1669,6 +1675,7 @@ function isAiLicenseBlockReason(reason) {
     "license_expired",
     "license_inactive",
     "quota_exhausted",
+    "quota_update_failed",
     "service_not_configured",
     "airtable_unavailable",
   ].includes(reason);
@@ -1683,6 +1690,7 @@ function aiLicenseBlockMessage(reason, fallback) {
     license_expired: "Licence expirée. Contactez-nous pour renouveler l'accès.",
     license_inactive: "Licence inactive. Contactez-nous pour vérifier votre accès.",
     quota_exhausted: "Quota IA atteint. Contactez-nous pour acheter une recharge de 100 générations.",
+    quota_update_failed: "Impossible de mettre à jour le quota IA. Vérifiez la configuration Airtable.",
     service_not_configured: "Service de licences non configuré.",
     airtable_unavailable: "Service de licences indisponible. Réessayez dans quelques instants.",
   };
@@ -1721,6 +1729,9 @@ function buildAiReportPayload(visit) {
 }
 
 function setReportGenerationLoading(isLoading) {
+  if (isLoading) {
+    showReportGenerationError("");
+  }
   elements.generateButton.disabled = isLoading;
   elements.generateButton.innerHTML = isLoading
     ? `<svg><use href="#icon-zap"></use></svg>Génération en cours…`
@@ -1851,7 +1862,8 @@ async function analyzeVisit() {
   } catch (error) {
     if (isAiLicenseBlockReason(error.reason)) {
       const message = aiLicenseBlockMessage(error.reason, error.userMessage);
-      renderReportNotice(message);
+      renderReport();
+      showReportGenerationError(message);
       showToast(message);
       renderLicenseBanner();
       return;
@@ -1875,6 +1887,7 @@ async function analyzeVisit() {
   });
   renderAll();
   renderDetailMeta();
+  showReportGenerationError("");
   showToast(toastMessage);
 }
 

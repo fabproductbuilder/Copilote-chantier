@@ -138,6 +138,13 @@ function sendJson(res, statusCode, payload) {
   res.end(JSON.stringify(payload));
 }
 
+function logGenerateReport(step, details = {}) {
+  console.warn("[generate-report]", {
+    step,
+    ...details,
+  });
+}
+
 function readBody(req) {
   if (req.body && typeof req.body === "object") return req.body;
   if (typeof req.body === "string") {
@@ -164,6 +171,7 @@ module.exports = async function handler(req, res) {
   try {
     payload = normalizePayload(readBody(req));
   } catch {
+    logGenerateReport("payload", { reason: "invalid_payload" });
     sendJson(res, 400, { ok: false, reason: "invalid_payload" });
     return;
   }
@@ -176,6 +184,10 @@ module.exports = async function handler(req, res) {
         ? 503
         : 403;
 
+    logGenerateReport("license", {
+      reason: licenseResult.reason,
+      statusCode,
+    });
     sendJson(res, statusCode, {
       ok: false,
       reason: licenseResult.reason,
@@ -187,6 +199,7 @@ module.exports = async function handler(req, res) {
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
+    logGenerateReport("config", { reason: "openai_missing_api_key" });
     sendJson(res, 503, {
       ok: false,
       reason: "openai_unavailable",
@@ -230,6 +243,7 @@ module.exports = async function handler(req, res) {
     });
 
     if (!response.ok) {
+      logGenerateReport("openai", { reason: "openai_unavailable", status: response.status });
       sendJson(res, 502, {
         ok: false,
         reason: "openai_unavailable",
@@ -242,13 +256,16 @@ module.exports = async function handler(req, res) {
     const report = extractOutputText(data);
 
     if (!report || !hasRequiredSections(report) || !isReportSafe(report)) {
+      logGenerateReport("openai", { reason: "invalid_ai_output" });
       sendJson(res, 502, { ok: false, reason: "invalid_ai_output" });
       return;
     }
 
     const usageResult = await incrementLicenseUsage(licenseResult.license);
     if (!usageResult.ok) {
-      sendJson(res, 503, {
+      const statusCode = usageResult.reason === "quota_update_failed" ? 502 : 503;
+      logGenerateReport("quota", { reason: usageResult.reason, statusCode });
+      sendJson(res, statusCode, {
         ok: false,
         reason: usageResult.reason,
         message: usageResult.message,
@@ -264,7 +281,8 @@ module.exports = async function handler(req, res) {
       quotaUsed: usageResult.quotaUsed,
       quotaRemaining: usageResult.quotaRemaining,
     });
-  } catch {
+  } catch (error) {
+    logGenerateReport("openai", { reason: "openai_unavailable", error: error?.name || "request_error" });
     sendJson(res, 502, {
       ok: false,
       reason: "openai_unavailable",
